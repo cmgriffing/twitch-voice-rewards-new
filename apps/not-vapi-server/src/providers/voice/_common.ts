@@ -1,11 +1,35 @@
+import { AiProvider } from "../_common";
 import { Voice } from "./_types";
 
-export function getVoiceById(voiceId: string, voices: Voice[]): Voice {
-  const voice = voices.find((voice) => voice.id === voiceId);
+export class VoiceProvider extends AiProvider {
+  voices: Voice[];
 
-  if (!voice) {
-    throw new Error(`Voice ${voiceId} not found`);
+  constructor(env: Record<string, string>) {
+    super(env);
+    this.voices = [];
   }
 
-  return voice;
+  async init() {
+    await this.syncVoices();
+    return this;
+  }
+
+  getVoices: () => Promise<Voice[]> = async () => {
+    throw new Error("getVoices not implemented for VoiceProvider");
+  };
+
+  syncVoices: () => Promise<void> = async () => {
+    const voices = await this.getVoices();
+    this.voices = voices;
+  };
+
+  getVoiceById(voiceId: string): Voice {
+    const voice = this.voices.find((voice) => voice.id === voiceId);
+
+    if (!voice) {
+      throw new Error(`Voice ${voiceId} not found`);
+    }
+
+    return voice;
+  }
 }

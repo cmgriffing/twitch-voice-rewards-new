@@ -1,12 +1,15 @@
-import type { ReadableStream } from "node:stream/web";
-import type { Voice, VoiceProvider } from "./_types";
-import { getVoiceById } from "./_common";
+import type { Voice, VoiceProviderMethods } from "./_types";
+import { VoiceProvider } from "./_common";
 
-const API_KEY = process.env.ELEVENLABS_KEY || "";
-
-export class ElevenLabsProvider implements VoiceProvider {
+export class ElevenLabsProvider
+  extends VoiceProvider
+  implements VoiceProviderMethods
+{
   voices: Voice[] = [];
-  async getVoices() {
+
+  getVoices = async () => {
+    const { ELEVENLABS_KEY: API_KEY } = this.env;
+
     const response = await fetch("https://api.elevenlabs.io/v1/voices", {
       headers: {
         "xi-api-key": API_KEY,
@@ -25,15 +28,17 @@ export class ElevenLabsProvider implements VoiceProvider {
       accent: "unknown",
       language: "en",
     }));
-  }
+  };
 
-  async syncVoices() {
+  syncVoices = async () => {
     const voices = await this.getVoices();
     this.voices = voices;
-  }
+  };
 
   async textToSpeech(text: string, voiceId: string) {
-    const voice = getVoiceById(voiceId, this.voices);
+    const { ELEVENLABS_KEY: API_KEY } = this.env;
+
+    const voice = this.getVoiceById(voiceId);
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voice.id}/stream`,

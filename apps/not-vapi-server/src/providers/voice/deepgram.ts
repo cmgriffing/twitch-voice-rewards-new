@@ -1,22 +1,24 @@
-import type { ReadableStream } from "node:stream/web";
-import type { Voice, VoiceProvider } from "./_types";
-import { getVoiceById } from "./_common";
+import type { Voice, VoiceProviderMethods } from "./_types";
+import { VoiceProvider } from "./_common";
 
-const API_KEY = process.env.DEEPGRAM_KEY;
-
-export class DeepgramProvider implements VoiceProvider {
+export class DeepgramProvider
+  extends VoiceProvider
+  implements VoiceProviderMethods
+{
   voices: Voice[] = [];
-  async getVoices() {
+  getVoices = async () => {
     return deepgramVoices;
-  }
+  };
 
-  async syncVoices() {
+  syncVoices = async () => {
     const voices = await this.getVoices();
     this.voices = voices;
-  }
+  };
 
   async textToSpeech(text: string, voiceId: string) {
-    const voice = getVoiceById(voiceId, this.voices);
+    const { DEEPGRAM_KEY: API_KEY } = this.env;
+
+    const voice = this.getVoiceById(voiceId);
 
     const response = await fetch(
       `https://api.deepgram.com/v1/speak?model=${voice.id}`,

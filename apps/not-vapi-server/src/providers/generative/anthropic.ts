@@ -1,13 +1,17 @@
-import { GenerativeProvider } from "./_types";
+import { AiProvider } from "../_common";
+import { GenerativeProviderMethods } from "./_types";
 
-const API_KEY = process.env.ANTHROPIC_KEY;
-
-export class AnthropicProvider implements GenerativeProvider {
+export class AnthropicProvider
+  extends AiProvider
+  implements GenerativeProviderMethods
+{
   async getPromptResponse(
     prompt: string,
     model: string,
     userName: string
   ): Promise<string> {
+    const { ANTHROPIC_KEY: API_KEY } = this.env;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {

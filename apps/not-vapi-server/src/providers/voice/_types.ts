@@ -1,13 +1,8 @@
-import type { ReadableStream } from "node:stream/web";
+import { VoiceProvider } from "./_common";
 
-export interface VoiceProvider {
-  voices: Voice[];
-
-  getVoices: () => Promise<Voice[]>;
-  syncVoices: () => Promise<void>;
-
+export type VoiceProviderMethods = VoiceProvider & {
   textToSpeech: (text: string, voice: string) => Promise<ReadableStream>;
-}
+};
 
 export interface Voice {
   id: string;

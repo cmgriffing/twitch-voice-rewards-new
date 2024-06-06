@@ -1,20 +1,15 @@
-import dotenv from "dotenv";
-dotenv.config();
-console.log("FOOOOOOOOOO", process.env);
-
-// const dotenv = require('dotenv')
-// const buf = Buffer.from('BASIC=basic')
-// const config = dotenv.parse(buf)
-
 import { Hono } from "hono";
-import { env } from "hono/adapter";
 import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
 
 import z from "zod";
-import { ReadableWebToNodeStream } from "readable-web-to-node-stream";
 
-import { generativeProviders, voiceProviders } from "./providers/index";
+import {
+  generativeAiProviders,
+  getAiProviders,
+  voiceAiProviders,
+} from "./providers/index";
+import { env } from "hono/adapter";
 
 const app = new Hono();
 
@@ -23,15 +18,16 @@ app.use("/*", cors());
 const promptRequestSchema = z.object({
   prompt: z.string(),
   userName: z.string(),
-  voiceProvider: z.string(),
+  voiceProvider: voiceAiProviders,
   voiceId: z.string(),
-  generativeProvider: z.string(),
+  generativeProvider: generativeAiProviders,
   generativeModel: z.string(),
 });
 
 app.post("/prompt", async (c) => {
   try {
-    console.log("env", env(c));
+    const aiProviders = await getAiProviders(env(c));
+
     const requestJson = await c.req.json();
     console.log({ requestJson });
 
@@ -51,7 +47,7 @@ app.post("/prompt", async (c) => {
     console.log({ validatedRequest });
 
     const generativeProvider =
-      generativeProviders[validatedRequest.generativeProvider];
+      aiProviders.generative[validatedRequest.generativeProvider];
 
     if (!generativeProvider) {
       throw new HTTPException(400, {
@@ -67,7 +63,7 @@ app.post("/prompt", async (c) => {
 
     console.log({ generativeResponse });
 
-    const voiceProvider = voiceProviders[validatedRequest.voiceProvider];
+    const voiceProvider = aiProviders.voice[validatedRequest.voiceProvider];
 
     if (!voiceProvider) {
       throw new HTTPException(400, {
@@ -80,11 +76,7 @@ app.post("/prompt", async (c) => {
       validatedRequest.voiceId
     );
 
-    const stream = new ReadableWebToNodeStream(
-      voiceResponse as ReadableStream
-    ) as unknown as ReadableStream;
-
-    return c.body(stream);
+    return c.body(voiceResponse);
   } catch (e: any) {
     console.log(e.message);
     throw e;

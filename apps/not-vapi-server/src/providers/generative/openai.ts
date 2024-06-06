@@ -1,15 +1,17 @@
-import { GenerativeProvider } from "./_types";
+import { AiProvider } from "../_common";
+import { GenerativeProviderMethods } from "./_types";
 
-const API_KEY = process.env.OPENAI_KEY;
-
-console.log(process.env);
-
-export class OpenaiProvider implements GenerativeProvider {
+export class OpenaiProvider
+  extends AiProvider
+  implements GenerativeProviderMethods
+{
   async getPromptResponse(
     prompt: string,
     model: string,
     userName: string
   ): Promise<string> {
+    const { OPENAI_KEY: API_KEY } = this.env;
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {

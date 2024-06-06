@@ -1,10 +1,12 @@
-export interface GenerativeProvider {
+import { AiProvider } from "../_common";
+
+export type GenerativeProviderMethods = AiProvider & {
   getPromptResponse: (
     prompt: string,
     model: string,
     userName: string
   ) => Promise<string>;
-}
+};
 
 export interface OpenaiPromptResponse {
   id: string;

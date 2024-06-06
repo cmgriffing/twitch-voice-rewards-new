@@ -1,13 +1,15 @@
-import { getVoiceById } from "./_common";
-import { Voice, VoiceProvider } from "./_types";
-import type { ReadableStream } from "node:stream/web";
+import { Voice, VoiceProviderMethods } from "./_types";
+import { VoiceProvider } from "./_common";
 
-const CLIENT_ID = process.env.PLAYHT_CLIENT_ID || "";
-const API_KEY = process.env.PLAYHT_KEY || "";
-
-export class PlayhtProvider implements VoiceProvider {
+export class PlayhtProvider
+  extends VoiceProvider
+  implements VoiceProviderMethods
+{
   voices: Voice[] = [];
-  async getVoices() {
+
+  getVoices = async () => {
+    const { PLAYHT_KEY: API_KEY, PLAYHT_CLIENT_ID: CLIENT_ID } = this.env;
+
     const response = await fetch("https://api.play.ht/api/v2/voices", {
       headers: {
         AUTHORIZATION: API_KEY,
@@ -24,15 +26,17 @@ export class PlayhtProvider implements VoiceProvider {
       accent: accent || "unknown",
       language: language_code,
     }));
-  }
+  };
 
-  async syncVoices() {
+  syncVoices = async () => {
     const voices = await this.getVoices();
     this.voices = voices;
-  }
+  };
 
   async textToSpeech(text: string, voiceId: string) {
-    const voice = getVoiceById(voiceId, this.voices);
+    const { PLAYHT_KEY: API_KEY, PLAYHT_CLIENT_ID: CLIENT_ID } = this.env;
+
+    const voice = this.getVoiceById(voiceId);
 
     const response = await fetch(`https://api.play.ht/api/v2/tts/stream`, {
       method: "POST",

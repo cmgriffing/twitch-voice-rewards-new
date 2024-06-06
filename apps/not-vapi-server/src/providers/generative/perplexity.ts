@@ -1,13 +1,17 @@
-import { OpenaiPromptResponse, type GenerativeProvider } from "./_types";
+import { AiProvider } from "../_common";
+import type { OpenaiPromptResponse, GenerativeProviderMethods } from "./_types";
 
-const API_KEY = process.env.PERPLEXITY_KEY;
-
-export class PerplexityProvider implements GenerativeProvider {
+export class PerplexityProvider
+  extends AiProvider
+  implements GenerativeProviderMethods
+{
   async getPromptResponse(
     prompt: string,
     model: string,
     userName: string
   ): Promise<string> {
+    const { PERPLEXITY_KEY: API_KEY } = this.env;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
