@@ -470,6 +470,27 @@ function App() {
     minRaiders,
   ]);
 
+  async function fetchPromptAudio(requestBody: {
+    prompt: string;
+    userName: string;
+    voiceProvider: string;
+    voiceId: string;
+    generativeProvider: string;
+    generativeModel: string;
+  }) {
+    const response = await fetch(`${apiBaseUrl}/prompt`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const responseBuffer = await response.arrayBuffer();
+
+    return responseBuffer;
+  }
+
   return (
     <>
       <Flex w={"100%"} direction="column">
@@ -480,8 +501,9 @@ function App() {
           Reward your Twitch supporters with a Voice Assistant acknowledging
           them.
         </Text>
-
-        <audio controls autoPlay ref={audioRef}></audio>
+        <Flex align="center" justify={"center"}>
+          <audio controls autoPlay ref={audioRef}></audio>
+        </Flex>
       </Flex>
       <Flex
         // direction="column"
@@ -838,6 +860,22 @@ function App() {
                 //   userQueue,
                 //   vapiInstance
                 // );
+
+                const responseBuffer = await fetchPromptAudio({
+                  prompt: selectedPrompt.promptText || customPrompt,
+                  userName: manualUsername,
+                  generativeProvider: selectedGenerativeProvider,
+                  generativeModel: selectedGenerativeModel,
+                  voiceProvider: selectedVoiceProvider,
+                  voiceId: selectedVoice,
+                });
+
+                if (audioRef.current) {
+                  const blob = new Blob([responseBuffer], {
+                    type: "audio/mpeg",
+                  });
+                  audioRef.current.src = URL.createObjectURL(blob);
+                }
 
                 setManualUsername("");
               }}
