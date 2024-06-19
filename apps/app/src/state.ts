@@ -26,7 +26,7 @@ export const availablePrompts: {
     name: "Sports Star",
     initialMessage: "We are in the presence of greatness.",
     promptText:
-      "I want you to imagine what kind of supervillain they would be. Describe them and their superpowers, and origin story while making sure to mention their name.",
+      "Imagine the user as a Sports Star. Decide what sport they play. Also describe their greatest play for that sport and create any other milestones that make sense.",
   },
   { icon: "⚙️", name: "Custom", initialMessage: "", promptText: "" },
 ];
