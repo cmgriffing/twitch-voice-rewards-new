@@ -1,10 +1,29 @@
-import { AiProvider } from "../_common";
+import { GenerativeProvider } from "./_common";
 import { GenerativeProviderMethods } from "./_types";
 
+import Anthropic from "@anthropic-ai/sdk";
+
 export class AnthropicProvider
-  extends AiProvider
+  extends GenerativeProvider
   implements GenerativeProviderMethods
 {
+  fetchModels = async () => {
+    return [
+      {
+        id: "claude-3-opus-20240229",
+        name: "Claude 3 Opus",
+      },
+      {
+        id: "claude-3-sonnet-20240229",
+        name: "Claude 3 Sonnet",
+      },
+      {
+        id: "claude-3-haiku-20240307",
+        name: "Claude 3 Haiku",
+      },
+    ];
+  };
+
   async getPromptResponse(
     prompt: string,
     model: string,
@@ -12,35 +31,56 @@ export class AnthropicProvider
   ): Promise<string> {
     const { ANTHROPIC_KEY: API_KEY } = this.env;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY || "",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: prompt,
-          },
-          {
-            role: "user",
-            content: `My name is ${userName}`,
-          },
-        ],
-      }),
+    // const response = await fetch("https://api.anthropic.com/v1/messages", {
+    //   method: "POST",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //     "x-api-key": API_KEY || "",
+    //   },
+    //   body: JSON.stringify({
+    //     model,
+    //     messages: [
+    //       {
+    //         role: "system",
+    //         content: prompt,
+    //       },
+    //       {
+    //         role: "user",
+    //         content: `My name is ${userName}`,
+    //       },
+    //     ],
+    //   }),
+    // });
+
+    // if (!response.ok) {
+    //   throw new Error((await response.text()) || "error");
+    // }
+
+    // const responseJson: AnthropicPromptResponse =
+    //   (await response.json()) as unknown as AnthropicPromptResponse;
+
+    // return responseJson.content[0].text;
+
+    const anthropic = new Anthropic({
+      apiKey: API_KEY,
     });
 
-    if (!response.ok) {
-      throw new Error((await response.text()) || "error");
-    }
+    const msg = await anthropic.messages.create({
+      model,
+      max_tokens: 1024000,
+      messages: [
+        {
+          role: "assistant",
+          content: prompt,
+        },
+        {
+          role: "user",
+          content: `My name is ${userName}`,
+        },
+      ],
+    });
 
-    const responseJson: AnthropicPromptResponse =
-      (await response.json()) as unknown as AnthropicPromptResponse;
-
-    return responseJson.content[0].text;
+    return msg.content.join(" ");
   }
 }
 

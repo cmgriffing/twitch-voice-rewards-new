@@ -7,7 +7,7 @@ export class PlayhtProvider
 {
   voices: Voice[] = [];
 
-  getVoices = async () => {
+  fetchVoices = async () => {
     const { PLAYHT_KEY: API_KEY, PLAYHT_CLIENT_ID: CLIENT_ID } = this.env;
 
     const response = await fetch("https://api.play.ht/api/v2/voices", {
@@ -29,7 +29,7 @@ export class PlayhtProvider
   };
 
   syncVoices = async () => {
-    const voices = await this.getVoices();
+    const voices = await this.fetchVoices();
     this.voices = voices;
   };
 

@@ -1,10 +1,34 @@
-import { AiProvider } from "../_common";
+import { GenerativeProvider } from "./_common";
 import type { OpenaiPromptResponse, GenerativeProviderMethods } from "./_types";
 
 export class PerplexityProvider
-  extends AiProvider
+  extends GenerativeProvider
   implements GenerativeProviderMethods
 {
+  fetchModels = async () => {
+    return [
+      {
+        id: "llama-3-sonar-small-32k-chat",
+        name: "llama-3-sonar-small-32k-chat",
+      },
+      {
+        id: "llama-3-sonar-small-32k-online",
+        name: "llama-3-sonar-small-32k-online",
+      },
+      {
+        id: "llama-3-sonar-large-32k-chat",
+        name: "llama-3-sonar-large-32k-chat",
+      },
+      {
+        id: "llama-3-sonar-large-32k-online",
+        name: "llama-3-sonar-large-32k-online",
+      },
+      { id: "llama-3-8b-instruct", name: "llama-3-8b-instruct" },
+      { id: "llama-3-70b-instruct", name: "llama-3-70b-instruct" },
+      { id: "mixtral-8x7b-instruct", name: "mixtral-8x7b-instruct" },
+    ];
+  };
+
   async getPromptResponse(
     prompt: string,
     model: string,

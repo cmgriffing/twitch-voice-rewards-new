@@ -1,5 +1,11 @@
 import { AiProvider } from "../_common";
 
+// TODO: dedupe this type since we also use it on the frontend
+export interface GenerativeModel {
+  id: string;
+  name: string;
+}
+
 export type GenerativeProviderMethods = AiProvider & {
   getPromptResponse: (
     prompt: string,

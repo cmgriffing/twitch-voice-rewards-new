@@ -1,3 +1,4 @@
+import { GenerativeProvider } from "./generative/_common";
 import z from "zod";
 import { VoiceProviderMethods } from "./voice/_types";
 import { GenerativeProviderMethods } from "./generative/_types";
@@ -8,6 +9,7 @@ import { PerplexityProvider } from "./generative/perplexity";
 import { DeepgramProvider } from "./voice/deepgram";
 import { ElevenLabsProvider } from "./voice/elevenlabs";
 import { PlayhtProvider } from "./voice/playht";
+import { VoiceProvider } from "./voice/_common";
 
 export const generativeAiProviders = z.enum([
   "anthropic",
@@ -18,6 +20,12 @@ export const generativeAiProviders = z.enum([
 export const voiceAiProviders = z.enum(["deepgram", "elevenlabs", "playht"]);
 
 export async function getAiProviders(env: Record<string, string>) {
+  const [openai, anthropic, perplexity] = await Promise.all([
+    new OpenaiProvider(env).init(),
+    new AnthropicProvider(env).init(),
+    new PerplexityProvider(env).init(),
+  ]);
+
   const [deepgram, elevenlabs, playht] = await Promise.all([
     new DeepgramProvider(env).init(),
     new ElevenLabsProvider(env).init(),
@@ -26,17 +34,20 @@ export async function getAiProviders(env: Record<string, string>) {
 
   return {
     generative: {
-      openai: new OpenaiProvider(env),
-      anthropic: new AnthropicProvider(env),
-      perplexity: new PerplexityProvider(env),
+      openai,
+      anthropic,
+      perplexity,
     } as Record<
       z.infer<typeof generativeAiProviders>,
-      GenerativeProviderMethods
+      GenerativeProvider & GenerativeProviderMethods
     >,
     voice: {
       deepgram,
       elevenlabs,
       playht,
-    } as Record<z.infer<typeof voiceAiProviders>, VoiceProviderMethods>,
+    } as Record<
+      z.infer<typeof voiceAiProviders>,
+      VoiceProvider & VoiceProviderMethods
+    >,
   };
 }

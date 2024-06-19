@@ -1,10 +1,26 @@
-import { AiProvider } from "../_common";
+import { GenerativeProvider } from "./_common";
 import { GenerativeProviderMethods } from "./_types";
 
+import OpenAI from "openai";
+
 export class OpenaiProvider
-  extends AiProvider
+  extends GenerativeProvider
   implements GenerativeProviderMethods
 {
+  fetchModels = async () => {
+    const { OPENAI_KEY: API_KEY } = this.env;
+    const openai = new OpenAI({
+      apiKey: API_KEY,
+    });
+
+    return (await openai.models.list()).data
+      .map((model) => ({
+        id: model.id,
+        name: model.id,
+      }))
+      .filter((model) => model.id.startsWith("gpt-"));
+  };
+
   async getPromptResponse(
     prompt: string,
     model: string,
@@ -12,35 +28,55 @@ export class OpenaiProvider
   ): Promise<string> {
     const { OPENAI_KEY: API_KEY } = this.env;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: prompt,
-          },
-          {
-            role: "user",
-            content: `My name is ${userName}`,
-          },
-        ],
-      }),
+    // const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    //   method: "POST",
+    //   headers: {
+    //     "Content-Type": "application/json",
+    //     Authorization: `Bearer ${API_KEY}`,
+    //   },
+    //   body: JSON.stringify({
+    //     model,
+    //     messages: [
+    //       {
+    //         role: "system",
+    //         content: prompt,
+    //       },
+    //       {
+    //         role: "user",
+    //         content: `My name is ${userName}`,
+    //       },
+    //     ],
+    //   }),
+    // });
+
+    // if (!response.ok) {
+    //   throw new Error((await response.text()) || "error");
+    // }
+
+    // const responseJson: OpenaiPromptResponse =
+    //   (await response.json()) as unknown as OpenaiPromptResponse;
+
+    // return responseJson.choices[0].message.content;
+
+    const openai = new OpenAI({
+      apiKey: API_KEY,
     });
 
-    if (!response.ok) {
-      throw new Error((await response.text()) || "error");
-    }
+    const chatCompletion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: prompt,
+        },
+        {
+          role: "user",
+          content: `My name is ${userName}`,
+        },
+      ],
+      model,
+    });
 
-    const responseJson: OpenaiPromptResponse =
-      (await response.json()) as unknown as OpenaiPromptResponse;
-
-    return responseJson.choices[0].message.content;
+    return chatCompletion.choices[0].message.content || "";
   }
 }
 

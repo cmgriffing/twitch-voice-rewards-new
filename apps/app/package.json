@@ -10,12 +10,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@highlight-run/react": "^3.2.2",
+    "@mantine/core": "^7.10.2",
+    "@mantine/hooks": "^7.10.2",
+    "@tabler/icons-react": "^3.6.0",
+    "highlight.run": "^8.13.0",
+    "jotai": "^2.8.3",
+    "lodash.debounce": "^4.0.8",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "tmi.js": "^1.8.5"
   },
   "devDependencies": {
+    "@types/lodash.debounce": "^4.0.9",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@types/tmi.js": "^1.8.6",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",

@@ -7,7 +7,7 @@ export class ElevenLabsProvider
 {
   voices: Voice[] = [];
 
-  getVoices = async () => {
+  fetchVoices = async () => {
     const { ELEVENLABS_KEY: API_KEY } = this.env;
 
     const response = await fetch("https://api.elevenlabs.io/v1/voices", {
@@ -16,7 +16,9 @@ export class ElevenLabsProvider
         "Content-Type": "application/json",
       },
     });
-    const rawVoices = (await response.json()) as ElevenLabsVoice[];
+    const { voices: rawVoices } = (await response.json()) as {
+      voices: ElevenLabsVoice[];
+    };
 
     // gender?: "male" | "female" | string;
     // language?: string;
@@ -31,7 +33,7 @@ export class ElevenLabsProvider
   };
 
   syncVoices = async () => {
-    const voices = await this.getVoices();
+    const voices = await this.fetchVoices();
     this.voices = voices;
   };
 

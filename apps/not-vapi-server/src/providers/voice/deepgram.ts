@@ -6,12 +6,12 @@ export class DeepgramProvider
   implements VoiceProviderMethods
 {
   voices: Voice[] = [];
-  getVoices = async () => {
+  fetchVoices = async () => {
     return deepgramVoices;
   };
 
   syncVoices = async () => {
-    const voices = await this.getVoices();
+    const voices = await this.fetchVoices();
     this.voices = voices;
   };
 
@@ -47,8 +47,8 @@ export class DeepgramProvider
 
 const deepgramVoices: Voice[] = [
   {
-    id: "aura-astaria-en",
-    name: "Astaria",
+    id: "aura-asteria-en",
+    name: "Asteria",
     gender: "female",
     language: "en",
     accent: "us",
