@@ -42,6 +42,7 @@ const telemetryMiddleware = async (c: any, next: any) => {
 app.use("/*", telemetryMiddleware as any);
 
 const promptRequestSchema = z.object({
+  initialMessage: z.string(),
   prompt: z.string(),
   username: z.string(),
   voiceProvider: voiceAiProviders,
@@ -149,7 +150,7 @@ app.post("/prompt", async (c) => {
 
     // TODO: See why this times out? or if it even does?
     const voiceResponse = await voiceProvider.textToSpeech(
-      generativeResponse,
+      `${validatedRequest.initialMessage} ${generativeResponse}`,
       validatedRequest.voiceId
     );
 

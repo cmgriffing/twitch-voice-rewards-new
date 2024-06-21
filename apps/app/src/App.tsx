@@ -438,7 +438,8 @@ function App() {
         setUserQueue(theRestOfTheNames);
 
         const responseBuffer = await fetchPromptAudio({
-          prompt: `${selectedPrompt.initialMessage || customInitialMessage} ${selectedPrompt.promptText || customPrompt}`,
+          prompt: selectedPrompt.promptText || customPrompt,
+          initialMessage: selectedPrompt.initialMessage || customInitialMessage,
           username,
           generativeProvider: selectedGenerativeProvider,
           generativeModel: selectedGenerativeModel,
