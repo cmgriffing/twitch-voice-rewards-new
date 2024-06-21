@@ -11,8 +11,12 @@ import {
   Textarea,
   SelectProps,
   Group,
+  Drawer,
+  List,
+  ActionIcon,
 } from "@mantine/core";
-import { IconCheck } from "@tabler/icons-react";
+import { useDisclosure } from "@mantine/hooks";
+import { IconCheck, IconTrash } from "@tabler/icons-react";
 import { useAtom } from "jotai";
 import debounce from "lodash.debounce";
 
@@ -57,8 +61,6 @@ export interface Voice {
   accent?: string;
 }
 
-const userCache: Record<string, number> = {};
-
 // function sendMessageToVapi(vapi: Vapi, username?: string) {
 //   if (username) {
 //     vapi.send({
@@ -73,68 +75,51 @@ const userCache: Record<string, number> = {};
 
 const userCacheTTL = 60 * 1000;
 
-// uses global state for simplicity for now
-async function initiateVapiResponse(
-  channel: string,
-  username: string,
-  usedBits: number,
-  minBits: number,
-  userQueue: { current: string[] }
-) {
-  if (minBits < 1) {
-    console.log("Min Bits must be greater than or equal to 1.");
-    return;
-  }
+// function handleSpeechEnd(
+//   queue: { current: string[] },
+//   isSpeaking: { current: boolean }
+// ) {
+//   if (isSpeaking.current) {
+//     console.log("Still speaking, bailing out of speech end");
+//     return;
+//   }
 
-  if (usedBits >= minBits) {
-    try {
-      // user caching to prevent messages too often. maybe temporary
-      if (
-        userCache[username] &&
-        Date.now() < userCache[username] + userCacheTTL
-      ) {
-        console.log("User is still in cache:", username);
-        return;
-      } else {
-        userCache[username] = Date.now();
-      }
+//   console.log("queue after shift: ", queue.current);
 
-      if (userQueue.current.length < 1) {
-        // await vapiInstance.start(vapiAssistantId);
-      }
+//   const username = queue.current.shift();
 
-      userQueue.current.push(username);
-      console.log("pushed to queue", userQueue.current);
-    } catch (e: unknown) {
-      console.log("Error starting assistant or sending message.", e);
-    }
-  }
-}
+//   console.log("queue after shift: ", queue.current);
 
-function handleSpeechEnd(
-  queue: { current: string[] },
-  isSpeaking: { current: boolean }
-) {
-  if (isSpeaking.current) {
-    console.log("Still speaking, bailing out of speech end");
-    return;
-  }
-
-  console.log("queue after shift: ", queue.current);
-
-  const username = queue.current.shift();
-
-  console.log("queue after shift: ", queue.current);
-
-  if (username) {
-    // sendMessageToVapi(vapi, username);
-  } else {
-    // is this the right place?
-    // vapi.stop();
-  }
-}
+//   if (username) {
+//     // sendMessageToVapi(vapi, username);
+//   } else {
+//     // is this the right place?
+//     // vapi.stop();
+//   }
+// }
 
 // const speechEndHandler = debounce(handleSpeechEnd, 5000);
+
+async function fetchPromptAudio(requestBody: {
+  prompt: string;
+  username: string;
+  voiceProvider: string;
+  voiceId: string;
+  generativeProvider: string;
+  generativeModel: string;
+}) {
+  const response = await fetch(`${apiBaseUrl}/prompt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const responseBuffer = await response.arrayBuffer();
+
+  return responseBuffer;
+}
 
 function App() {
   const [channelName, setChannelName] = useAtom(channelNameState);
@@ -181,9 +166,18 @@ function App() {
   const [availableVoices, setAvailableVoices] = useState<
     Record<string, Voice[]>
   >({});
-  const userQueue = useRef<string[]>([]);
+  const [userQueue, setUserQueue] = useState<string[]>([]);
+  // const [userQueue, setUserQueue] = useState<string[]>([
+  //   "cmgriffing",
+  //   "foo",
+  //   "bar",
+  // ]);
 
-  const isSpeaking = useRef(false);
+  // const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentUsername, setCurrentUsername] = useState("");
+
+  const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
+
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -232,9 +226,26 @@ function App() {
     }
 
     getProvidersAndModels();
+
+    const audioEndedListener = function () {
+      setCurrentUsername("");
+    };
+
+    if (audioRef.current) {
+      audioRef.current.addEventListener("ended", audioEndedListener);
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.removeEventListener("ended", audioEndedListener);
+      }
+    };
   }, []);
 
   useEffect(() => {
+    function addUserToQueue(username: string) {
+      setUserQueue((currentUserQueue) => [...currentUserQueue, username]);
+    }
     const client = new tmi.Client({
       // options: { debug: true },
       // identity: {
@@ -254,16 +265,9 @@ function App() {
               console.log("CHEER:", { channel, userstate, message });
               if (userstate?.bits && userstate.username) {
                 const usedBits = parseInt(userstate?.bits || "0", 10);
-                // await initiateVapiResponse(
-                //   channelName,
-                //   userstate.username,
-                //   usedBits,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
+                if (usedBits >= minBits) {
+                  addUserToQueue(userstate.username);
+                }
               }
             } catch (e: unknown) {
               console.log("Error in CHEER:", e);
@@ -297,16 +301,7 @@ function App() {
                 "";
 
               if (giftedUsername) {
-                // await initiateVapiResponse(
-                //   channelName,
-                //   giftedUsername,
-                //   minBits + 1,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
+                addUserToQueue(giftedUsername);
               }
             }
           );
@@ -328,16 +323,7 @@ function App() {
                 "";
 
               if (giftedUsername) {
-                // await initiateVapiResponse(
-                //   channelName,
-                //   giftedUsername,
-                //   minBits + 1,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
+                addUserToQueue(giftedUsername);
               }
             }
           );
@@ -354,17 +340,7 @@ function App() {
                 message,
                 userstate,
               });
-
-              // await initiateVapiResponse(
-              //   channelName,
-              //   username,
-              //   minBits + 1,
-              //   minBits,
-              //   vapiAssistantId,
-              //   vapiPublicKey,
-              //   userQueue,
-              //   vapiInstance
-              // );
+              addUserToQueue(username);
             }
           );
 
@@ -378,17 +354,7 @@ function App() {
                 message,
                 userstate,
               });
-
-              // await initiateVapiResponse(
-              //   channelName,
-              //   username,
-              //   minBits + 1,
-              //   minBits,
-              //   vapiAssistantId,
-              //   vapiPublicKey,
-              //   userQueue,
-              //   vapiInstance
-              // );
+              addUserToQueue(username);
             }
           );
         }
@@ -403,16 +369,7 @@ function App() {
 
             if (viewers >= minRaiders) {
               setTimeout(() => {
-                // initiateVapiResponse(
-                //   channelName,
-                //   username,
-                //   minBits + 1,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
+                addUserToQueue(username);
               }, 10000);
             }
           });
@@ -425,21 +382,11 @@ function App() {
               console.log("MESSAGE:", { channel, userstate, message });
 
               if (
-                userstate.username &&
-                !!userstate.subscriber
+                userstate.username
+                // && !!userstate.subscriber
                 //  && userstate.username === "cmgriffing"
               ) {
-                const usedBits = 100;
-                // await initiateVapiResponse(
-                //   channelName,
-                //   userstate.username,
-                //   usedBits,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
+                addUserToQueue(userstate.username);
               }
             } catch (e: unknown) {
               console.log("Error in MESSAGE:", e);
@@ -470,29 +417,145 @@ function App() {
     minRaiders,
   ]);
 
-  async function fetchPromptAudio(requestBody: {
-    prompt: string;
-    userName: string;
-    voiceProvider: string;
-    voiceId: string;
-    generativeProvider: string;
-    generativeModel: string;
-  }) {
-    const response = await fetch(`${apiBaseUrl}/prompt`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!currentUsername && userQueue.length > 0) {
+        const [username, ...theRestOfTheNames] = userQueue;
+        setCurrentUsername(username);
+        setUserQueue(theRestOfTheNames);
 
-    const responseBuffer = await response.arrayBuffer();
+        const responseBuffer = await fetchPromptAudio({
+          prompt: selectedPrompt.promptText || customPrompt,
+          username,
+          generativeProvider: selectedGenerativeProvider,
+          generativeModel: selectedGenerativeModel,
+          voiceProvider: selectedVoiceProvider,
+          voiceId: selectedVoice,
+        });
 
-    return responseBuffer;
-  }
+        if (audioRef.current) {
+          const blob = new Blob([responseBuffer], {
+            type: "audio/mpeg",
+          });
+          audioRef.current.src = URL.createObjectURL(blob);
+        }
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [
+    userQueue,
+    currentUsername,
+    customPrompt,
+    selectedPrompt,
+    selectedGenerativeModel,
+    selectedGenerativeProvider,
+    selectedVoiceProvider,
+    selectedVoice,
+  ]);
 
   return (
     <>
+      <Drawer
+        opened={queueOpened}
+        onClose={closeQueue}
+        title={"Queue"}
+        position="right"
+        keepMounted
+        // w={"240px"}
+        size="xs"
+      >
+        <Flex direction="column" gap="1rem">
+          <Flex align="center" justify={"center"} direction={"column"}>
+            {!currentUsername && !userQueue.length && (
+              <Flex>No current username</Flex>
+            )}
+            {Boolean(currentUsername) && (
+              <Flex direction="column" w="100%">
+                <Text fw="bold">Current Username</Text>
+                {currentUsername}
+              </Flex>
+            )}
+            <audio controls autoPlay ref={audioRef}></audio>
+          </Flex>
+
+          <List listStyleType="none" w="100%">
+            {!userQueue.length && <Flex>Queue empty</Flex>}
+            {userQueue.map((username, index) => {
+              return (
+                <li>
+                  <Flex
+                    bg={index % 2 == 1 ? "#E0E0E0" : "#EEEEEE"}
+                    p={8}
+                    w="100%"
+                    justify={"space-between"}
+                  >
+                    <Text>{username}</Text>
+                    <ActionIcon
+                      bg="red"
+                      onClick={() => {
+                        setUserQueue(userQueue.filter((u, i) => i !== index));
+                      }}
+                    >
+                      <IconTrash />
+                    </ActionIcon>
+                  </Flex>
+                </li>
+              );
+            })}
+          </List>
+
+          <Flex direction="column" bg={"#ffeeee"} p="1rem" gap="1rem">
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (manualUsername.trim()) {
+                  setUserQueue([...userQueue, manualUsername]);
+                  setManualUsername("");
+                }
+              }}
+            >
+              <Text fw={600}>Add User to Queue</Text>
+              <Flex direction="column" align={"flex-start"}>
+                <label htmlFor="manual-username">Username</label>
+                <Input
+                  w="100%"
+                  id="manual-username"
+                  name="manual-username"
+                  type="text"
+                  value={manualUsername}
+                  onChange={(e) => {
+                    setManualUsername(e.currentTarget.value);
+                  }}
+                />
+              </Flex>
+              <Flex align="flex-end" justify={"flex-end"} w={"100%"}>
+                <Button type="submit">Send</Button>
+              </Flex>
+            </form>
+          </Flex>
+        </Flex>
+      </Drawer>
+
+      <Button
+        style={{
+          position: "fixed",
+          right: "1rem",
+          top: "1rem",
+        }}
+        onClick={() => {
+          if (queueOpened) {
+            closeQueue();
+          } else {
+            openQueue();
+          }
+        }}
+      >
+        Queue
+      </Button>
+
       <Flex w={"100%"} direction="column">
         <Text size="xl" fw={700} ta="center">
           🔊 Twitch Voice Rewards 🔊
@@ -501,9 +564,6 @@ function App() {
           Reward your Twitch supporters with a Voice Assistant acknowledging
           them.
         </Text>
-        <Flex align="center" justify={"center"}>
-          <audio controls autoPlay ref={audioRef}></audio>
-        </Flex>
       </Flex>
       <Flex
         // direction="column"
@@ -843,66 +903,6 @@ function App() {
                 </Flex>
               )}
             </Flex>
-          </Flex>
-
-          <Flex direction="column" bg={"#ffeeee"} p="1rem" gap="1rem">
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-
-                // await initiateVapiResponse(
-                //   channelName,
-                //   manualUsername,
-                //   minBits + 1,
-                //   minBits,
-                //   vapiAssistantId,
-                //   vapiPublicKey,
-                //   userQueue,
-                //   vapiInstance
-                // );
-
-                const responseBuffer = await fetchPromptAudio({
-                  prompt: selectedPrompt.promptText || customPrompt,
-                  userName: manualUsername,
-                  generativeProvider: selectedGenerativeProvider,
-                  generativeModel: selectedGenerativeModel,
-                  voiceProvider: selectedVoiceProvider,
-                  voiceId: selectedVoice,
-                });
-
-                if (audioRef.current) {
-                  const blob = new Blob([responseBuffer], {
-                    type: "audio/mpeg",
-                  });
-                  audioRef.current.src = URL.createObjectURL(blob);
-                }
-
-                setManualUsername("");
-              }}
-            >
-              <Text fw={600}>Manual Trigger</Text>
-              <Text>
-                Occasionally, the bot might make a mistake. If you would like to
-                manually trigger an announcement, you can use this form by
-                pasting the username yourself.
-              </Text>
-              <Flex direction="column" align={"flex-start"}>
-                <label htmlFor="manual-username">Username</label>
-                <Input
-                  w="100%"
-                  id="manual-username"
-                  name="manual-username"
-                  type="text"
-                  value={manualUsername}
-                  onChange={(e) => {
-                    setManualUsername(e.currentTarget.value);
-                  }}
-                />
-              </Flex>
-              <Flex align="flex-end" justify={"flex-end"} w={"100%"}>
-                <Button type="submit">Send</Button>
-              </Flex>
-            </form>
           </Flex>
         </Flex>
       </Flex>

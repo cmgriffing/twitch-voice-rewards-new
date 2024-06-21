@@ -43,7 +43,7 @@ app.use("/*", telemetryMiddleware as any);
 
 const promptRequestSchema = z.object({
   prompt: z.string(),
-  userName: z.string(),
+  username: z.string(),
   voiceProvider: voiceAiProviders,
   voiceId: z.string(),
   generativeProvider: generativeAiProviders,
@@ -134,7 +134,7 @@ app.post("/prompt", async (c) => {
 
       Limit the description to 30 seconds. Make sure to always reference them as they or their.`,
       validatedRequest.generativeModel,
-      validatedRequest.userName
+      validatedRequest.username
     );
 
     console.log({ generativeResponse });
@@ -147,6 +147,7 @@ app.post("/prompt", async (c) => {
       });
     }
 
+    // TODO: See why this times out? or if it even does?
     const voiceResponse = await voiceProvider.textToSpeech(
       generativeResponse,
       validatedRequest.voiceId
