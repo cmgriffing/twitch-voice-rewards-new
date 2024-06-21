@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Input,
   Flex,
@@ -179,6 +179,7 @@ function App() {
   const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const endedEventAttachedRef = useRef(false);
 
   useEffect(() => {
     async function getProvidersAndModels() {
@@ -226,21 +227,21 @@ function App() {
     }
 
     getProvidersAndModels();
-
-    const audioEndedListener = function () {
-      setCurrentUsername("");
-    };
-
-    if (audioRef.current) {
-      audioRef.current.addEventListener("ended", audioEndedListener);
-    }
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener("ended", audioEndedListener);
-      }
-    };
   }, []);
+
+  // useLayoutEffect(() => {
+  //   const audioEndedListener = function () {
+  //     setCurrentUsername("");
+  //   };
+
+  //   const audioElement = audioRef.current;
+  //     if (audioElement) {
+  //       console.log("Attaching ended event");
+  //       audioElement.addEventListener("ended", audioEndedListener);
+  //     } else {
+  //       console.log("Ended event not attached");
+  //     }
+  // }, []);
 
   useEffect(() => {
     function addUserToQueue(username: string) {
@@ -419,6 +420,18 @@ function App() {
 
   useEffect(() => {
     const interval = setInterval(async () => {
+      if (!endedEventAttachedRef.current) {
+        if (audioRef.current) {
+          console.log("Attaching ended event");
+          audioRef.current.addEventListener("ended", function () {
+            setCurrentUsername("");
+          });
+          endedEventAttachedRef.current = true;
+        } else {
+          console.log("Ended event not attached");
+        }
+      }
+
       if (!currentUsername && userQueue.length > 0) {
         const [username, ...theRestOfTheNames] = userQueue;
         setCurrentUsername(username);
