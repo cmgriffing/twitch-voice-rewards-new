@@ -104,6 +104,7 @@ async function fetchPromptAudio(requestBody: {
   prompt: string;
   username: string;
   voiceProvider: string;
+  initialMessage: string;
   voiceId: string;
   generativeProvider: string;
   generativeModel: string;
@@ -437,21 +438,28 @@ function App() {
         setCurrentUsername(username);
         setUserQueue(theRestOfTheNames);
 
-        const responseBuffer = await fetchPromptAudio({
-          prompt: selectedPrompt.promptText || customPrompt,
-          initialMessage: selectedPrompt.initialMessage || customInitialMessage,
-          username,
-          generativeProvider: selectedGenerativeProvider,
-          generativeModel: selectedGenerativeModel,
-          voiceProvider: selectedVoiceProvider,
-          voiceId: selectedVoice,
-        });
-
-        if (audioRef.current) {
-          const blob = new Blob([responseBuffer], {
-            type: "audio/mpeg",
+        try {
+          const responseBuffer = await fetchPromptAudio({
+            prompt: selectedPrompt.promptText || customPrompt,
+            initialMessage:
+              selectedPrompt.initialMessage || customInitialMessage,
+            username,
+            generativeProvider: selectedGenerativeProvider,
+            generativeModel: selectedGenerativeModel,
+            voiceProvider: selectedVoiceProvider,
+            voiceId: selectedVoice,
           });
-          audioRef.current.src = URL.createObjectURL(blob);
+
+          if (audioRef.current) {
+            const blob = new Blob([responseBuffer], {
+              type: "audio/mpeg",
+            });
+            audioRef.current.src = URL.createObjectURL(blob);
+          }
+        } catch (e: any) {
+          console.log("failed fetching audio");
+          // TODO: maybe add user to failed list to be able to re-add them
+          setCurrentUsername("");
         }
       }
     }, 1000);
@@ -468,6 +476,7 @@ function App() {
     selectedGenerativeProvider,
     selectedVoiceProvider,
     selectedVoice,
+    customInitialMessage,
   ]);
 
   return (
@@ -707,6 +716,9 @@ function App() {
                   return;
                 }
                 setSelectedGenerativeProvider(actualProvider);
+                setSelectedGenerativeModel(
+                  availableModels[actualProvider]?.[0]?.id
+                );
               }}
               renderOption={({ option, checked }) => (
                 <Group flex="1" gap="xs">
@@ -781,6 +793,9 @@ function App() {
                     return;
                   }
                   setSelectedVoiceProvider(actualVoiceProvider);
+                  setSelectedVoice(
+                    availableVoices[actualVoiceProvider]?.[0]?.id || ""
+                  );
                 }}
                 renderOption={({ option, checked }) => (
                   <Group flex="1" gap="xs">
@@ -796,7 +811,7 @@ function App() {
 
           {Boolean(selectedVoiceProvider) && (
             <Flex direction="column" align={"flex-start"}>
-              <label htmlFor="selected-voice">Voice Provider</label>
+              <label htmlFor="selected-voice">Voice</label>
               <Select
                 w="100%"
                 id="selected-voice"
