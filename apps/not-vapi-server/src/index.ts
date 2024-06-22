@@ -5,6 +5,11 @@ import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
 
+// nodeJS specific
+import path from "path";
+import fs from "fs";
+import { glob } from "glob";
+
 // CF specific
 // import { H } from "@highlight-run/cloudflare";
 import { H } from "@highlight-run/node";
@@ -19,6 +24,7 @@ import {
 } from "./providers/index";
 import { env } from "hono/adapter";
 import { GenerativeModel } from "./providers/generative/_types";
+import { ReadableStream } from "stream/web";
 
 const HIGHLIGHT_PROJECT_ID = "lgxrjr4g";
 
@@ -154,15 +160,62 @@ app.post("/prompt", async (c) => {
       validatedRequest.voiceId
     );
 
+    // const reader = voiceResponse.getReader();
+
+    // const readableStream = new ReadableStream<Uint8Array>({
+    //   start(controller) {
+    //     return pump();
+
+    //     function pump(): any {
+    //       return reader.read().then(({ done, value }) => {
+    //         // When no more data needs to be consumed, close the stream
+    //         if (done) {
+    //           controller.close();
+    //           return;
+    //         }
+
+    //         // Enqueue the next data chunk into our target stream
+    //         controller.enqueue(value);
+    //         return pump();
+    //       });
+    //     }
+    //   },
+    // });
+
+    const today = new Date();
+    const year = today.getFullYear() + "";
+    const monthNumber = today.getMonth() + 1;
+    const month = monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
+
+    const fileDir = path.resolve(__dirname, "../archives/voice/", year, month);
+    await fs.promises.mkdir(fileDir, { recursive: true });
+
+    const existingFiles = await glob(
+      path.resolve(fileDir, `${validatedRequest.username}-*`)
+    );
+    const increment = existingFiles.length;
+    const fileName = `${validatedRequest.username}-${increment}.mp3`;
+    const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
+    console.log("voiceResponse", Object.keys(voiceResponse));
+    voiceResponse.pipe(fileStream);
+
     const response = c.body(voiceResponse);
+
+    return response;
 
     // CF specific
     // H.sendResponse(response);
-
-    return response;
+    // return response;
   } catch (e: any) {
     console.log(e.message);
-    throw e;
+
+    if (!(e instanceof HTTPException)) {
+      throw new HTTPException(500, {
+        message: "An unknown error has occurred",
+      });
+    } else {
+      throw e;
+    }
   }
 });
 

@@ -1,5 +1,7 @@
 import type { Voice, VoiceProviderMethods } from "./_types";
 import { VoiceProvider } from "./_common";
+import { ReadableStream } from "stream/web";
+import fetch from "node-fetch";
 
 export class DeepgramProvider
   extends VoiceProvider
@@ -41,7 +43,7 @@ export class DeepgramProvider
       throw new Error("voice response body empty");
     }
 
-    return response.body as ReadableStream<Uint8Array>;
+    return response.body; //  as ReadableStream<Uint8Array>;
   }
 }
 
