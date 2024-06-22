@@ -70,7 +70,7 @@ export class AnthropicProvider
       max_tokens: 1024000,
       messages: [
         {
-          role: "assistant",
+          role: "user",
           content: prompt,
         },
         {
