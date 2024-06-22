@@ -40,6 +40,23 @@ import {
   selectedVoiceState,
 } from "./state";
 
+import { H } from "highlight.run";
+
+H.init("lgxrjr4g", {
+  serviceName: "frontend-app",
+  tracingOrigins: true,
+  networkRecording: {
+    enabled: true,
+    recordHeadersAndBody: true,
+    urlBlocklist: [
+      // insert full or partial urls that you don't want to record here
+      // Out of the box, Highlight will not record these URLs (they can be safely removed):
+      "https://www.googleapis.com/identitytoolkit",
+      "https://securetoken.googleapis.com",
+    ],
+  },
+});
+
 // definitely not the right port
 const apiBaseUrl = import.meta.env.API_URL || "http://localhost:3000";
 

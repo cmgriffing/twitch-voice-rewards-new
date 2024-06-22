@@ -36,12 +36,17 @@ const app = new Hono();
 app.use("/*", cors() as any);
 
 const telemetryMiddleware = async (c: any, next: any) => {
+  console.log("Initializing middleware");
+
   H.init(
     { projectID: HIGHLIGHT_PROJECT_ID }
     // CF specific
     // c.req.raw, highlightMetaData, c.executionCtx
   );
-  traceloop.initialize({ appName: "twitch_voice_rewards" });
+  traceloop.initialize({
+    appName: "twitch_voice_rewards",
+    baseUrl: "https://otel.highlight.io:4318",
+  });
 
   await next();
 };
