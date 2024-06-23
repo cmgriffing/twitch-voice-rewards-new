@@ -69,13 +69,13 @@ export class AnthropicProvider
       model,
       max_tokens: 1024000,
       messages: [
+        // {
+        //   role: "user",
+        //   content: `My name is ${userName}`,
+        // },
         {
           role: "user",
-          content: prompt,
-        },
-        {
-          role: "user",
-          content: `My name is ${userName}`,
+          content: `${prompt} The username is ${userName}`,
         },
       ],
     });
