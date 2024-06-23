@@ -67,7 +67,7 @@ export class AnthropicProvider
 
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 1024000,
+      max_tokens: 4096,
       messages: [
         // {
         //   role: "user",
@@ -80,7 +80,11 @@ export class AnthropicProvider
       ],
     });
 
-    return msg.content.join(" ");
+    console.log({ msg: msg.content });
+
+    return msg.content
+      .map((content) => (content.type === "text" ? content.text : ""))
+      .join(" ");
   }
 }
 
