@@ -26,7 +26,7 @@ export const availablePrompts: {
     name: "Sports Star",
     initialMessage: "We are in the presence of greatness.",
     promptText:
-      "Imagine the user as a Sports Star. Decide what sport they play. Also describe their greatest play for that sport and create any other milestones that make sense.",
+      "Imagine the user as a Sports Star. Decide what sport they play. Also describe their greatest play for that sport and create any other milestones that make sense. Try to avoid common sports like basketball or soccer. The more obscure the sport the better.",
   },
   { icon: "⚙️", name: "Custom", initialMessage: "", promptText: "" },
 ];
