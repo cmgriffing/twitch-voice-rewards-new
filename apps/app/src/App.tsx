@@ -424,7 +424,11 @@ function App() {
             voiceId,
           });
 
+          console.log("responseBuffer", responseBuffer);
+
           if (audioRef.current) {
+            console.log("Are we making it in here?");
+
             const blob = new Blob([responseBuffer], {
               type: "audio/mpeg",
             });

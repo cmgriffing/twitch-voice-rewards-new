@@ -153,10 +153,11 @@ app.post("/prompt", async (c) => {
       path.resolve(fileDir, `${validatedRequest.username}-*`),
     );
     const increment = existingFiles.length;
-    const fileName = `${validatedRequest.username}-${increment}.mp3`;
-    const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
-    console.log("voiceResponse", Object.keys(voiceResponse));
-    Readable.fromWeb(voiceResponse as any).pipe(fileStream);
+    // const fileName = `${validatedRequest.username}-${increment}.mp3`;
+    // const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
+    // console.log("voiceResponse", typeof voiceResponse);
+    // Readable.fromWeb
+    // (voiceResponse as any).pipe(fileStream);
 
     const response = c.body(voiceResponse);
 

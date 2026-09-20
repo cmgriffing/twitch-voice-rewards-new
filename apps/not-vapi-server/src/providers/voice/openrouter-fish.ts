@@ -133,6 +133,7 @@ export class OpenRouterFishProvider
         model: "fish-audio/s2.1-pro",
         voice: voice.id,
         speed: 1,
+        responseFormat: "mp3",
       },
     });
 
