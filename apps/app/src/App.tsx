@@ -1,15 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Input,
   Flex,
   Text,
-  PasswordInput,
   Checkbox,
-  Accordion,
   Button,
   Select,
   Textarea,
-  SelectProps,
   Group,
   Drawer,
   List,
@@ -18,7 +15,6 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { IconCheck, IconTrash } from "@tabler/icons-react";
 import { useAtom } from "jotai";
-import debounce from "lodash.debounce";
 
 import "./App.css";
 import tmi from "tmi.js";
@@ -40,23 +36,6 @@ import {
   selectedVoiceState,
 } from "./state";
 
-import { H } from "highlight.run";
-
-H.init("lgxrjr4g", {
-  serviceName: "frontend-app",
-  tracingOrigins: true,
-  networkRecording: {
-    enabled: true,
-    recordHeadersAndBody: true,
-    urlBlocklist: [
-      // insert full or partial urls that you don't want to record here
-      // Out of the box, Highlight will not record these URLs (they can be safely removed):
-      "https://www.googleapis.com/identitytoolkit",
-      "https://securetoken.googleapis.com",
-    ],
-  },
-});
-
 // definitely not the right port
 const apiBaseUrl = import.meta.env.API_URL || "http://localhost:3000";
 
@@ -77,45 +56,6 @@ export interface Voice {
   language?: string;
   accent?: string;
 }
-
-// function sendMessageToVapi(vapi: Vapi, username?: string) {
-//   if (username) {
-//     vapi.send({
-//       type: "add-message",
-//       message: {
-//         role: "user",
-//         content: `The username is ${username}`,
-//       },
-//     });
-//   }
-// }
-
-const userCacheTTL = 60 * 1000;
-
-// function handleSpeechEnd(
-//   queue: { current: string[] },
-//   isSpeaking: { current: boolean }
-// ) {
-//   if (isSpeaking.current) {
-//     console.log("Still speaking, bailing out of speech end");
-//     return;
-//   }
-
-//   console.log("queue after shift: ", queue.current);
-
-//   const username = queue.current.shift();
-
-//   console.log("queue after shift: ", queue.current);
-
-//   if (username) {
-//     // sendMessageToVapi(vapi, username);
-//   } else {
-//     // is this the right place?
-//     // vapi.stop();
-//   }
-// }
-
-// const speechEndHandler = debounce(handleSpeechEnd, 5000);
 
 async function fetchPromptAudio(requestBody: {
   prompt: string;
@@ -144,33 +84,33 @@ function App() {
   const [selectedPrompt, setSelectedPrompt] = useAtom(selectedPromptState);
   const [customPrompt, setCustomPrompt] = useAtom(customPromptState);
   const [customInitialMessage, setCustomInitialMessage] = useAtom(
-    customInitialMessageState
+    customInitialMessageState,
   );
 
   const [selectedGenerativeProvider, setSelectedGenerativeProvider] = useAtom(
-    selectedGenerativeProviderState
+    selectedGenerativeProviderState,
   );
   const [selectedGenerativeModel, setSelectedGenerativeModel] = useAtom(
-    selectedGenerativeModelState
+    selectedGenerativeModelState,
   );
   const [selectedVoiceProvider, setSelectedVoiceProvider] = useAtom(
-    selectedVoiceProviderState
+    selectedVoiceProviderState,
   );
   const [selectedVoice, setSelectedVoice] = useAtom(selectedVoiceState);
 
   const [shouldTriggerBits, setShouldTriggerBits] = useAtom(
-    shouldTriggerBitsState
+    shouldTriggerBitsState,
   );
   const [minBits, setMinBits] = useAtom(minBitsState);
   const [shouldTriggerSubs, setShouldTriggerSubs] = useAtom(
-    shouldTriggerSubsState
+    shouldTriggerSubsState,
   );
   const [shouldTriggerGifts, setShouldTriggerGifts] = useAtom(
-    shouldTriggerGiftsState
+    shouldTriggerGiftsState,
   );
 
   const [shouldTriggerRaids, setShouldTriggerRaids] = useAtom(
-    shouldTriggerRaidsState
+    shouldTriggerRaidsState,
   );
   const [minRaiders, setMinRaiders] = useAtom(minRaidersState);
 
@@ -185,14 +125,9 @@ function App() {
     Record<string, Voice[]>
   >({});
   const [userQueue, setUserQueue] = useState<string[]>([]);
-  // const [userQueue, setUserQueue] = useState<string[]>([
-  //   "cmgriffing",
-  //   "foo",
-  //   "bar",
-  // ]);
-
-  // const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentUsername, setCurrentUsername] = useState("");
+  const [shouldRandomizePrompt, setShouldRandomizePrompt] = useState(false);
+  const [shouldRandomizeVoice, setShouldRandomizeVoice] = useState(false);
 
   const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
 
@@ -303,7 +238,7 @@ function App() {
               streakMonths,
               recipient,
               methods,
-              userstate
+              userstate,
             ) => {
               console.log("SUBGIFT", {
                 channel,
@@ -322,7 +257,7 @@ function App() {
               if (giftedUsername) {
                 addUserToQueue(giftedUsername);
               }
-            }
+            },
           );
 
           client.on(
@@ -344,7 +279,7 @@ function App() {
               if (giftedUsername) {
                 addUserToQueue(giftedUsername);
               }
-            }
+            },
           );
         }
 
@@ -360,7 +295,7 @@ function App() {
                 userstate,
               });
               addUserToQueue(username);
-            }
+            },
           );
 
           client.on(
@@ -374,7 +309,7 @@ function App() {
                 userstate,
               });
               addUserToQueue(username);
-            }
+            },
           );
         }
 
@@ -456,15 +391,37 @@ function App() {
         setUserQueue(theRestOfTheNames);
 
         try {
+          let prompt = selectedPrompt.promptText || customPrompt;
+          if (shouldRandomizePrompt) {
+            const nonCustomPrompts = availablePrompts.filter(
+              (prompt) => prompt.name !== "Custom",
+            );
+
+            prompt =
+              nonCustomPrompts[
+                Math.floor(Math.random() * nonCustomPrompts.length)
+              ].promptText;
+          }
+
+          let voiceId = selectedVoice;
+          if (shouldRandomizeVoice) {
+            voiceId =
+              availableVoices[selectedVoiceProvider][
+                Math.floor(
+                  Math.random() * availableVoices[selectedVoiceProvider].length,
+                )
+              ].id;
+          }
+
           const responseBuffer = await fetchPromptAudio({
-            prompt: selectedPrompt.promptText || customPrompt,
+            prompt,
             initialMessage:
               selectedPrompt.initialMessage || customInitialMessage,
             username,
             generativeProvider: selectedGenerativeProvider,
             generativeModel: selectedGenerativeModel,
             voiceProvider: selectedVoiceProvider,
-            voiceId: selectedVoice,
+            voiceId,
           });
 
           if (audioRef.current) {
@@ -536,7 +493,7 @@ function App() {
                     <ActionIcon
                       bg="red"
                       onClick={() => {
-                        setUserQueue(userQueue.filter((u, i) => i !== index));
+                        setUserQueue(userQueue.filter((_u, i) => i !== index));
                       }}
                     >
                       <IconTrash />
@@ -649,7 +606,7 @@ function App() {
                   return;
                 }
                 const actualPrompt = availablePrompts.find(
-                  (prompt) => prompt.name === newSelectedPrompt
+                  (prompt) => prompt.name === newSelectedPrompt,
                 );
                 if (!actualPrompt) {
                   return;
@@ -665,6 +622,16 @@ function App() {
                 </Group>
               )}
             ></Select>
+          </Flex>
+
+          <Flex direction="column" align={"flex-end"}>
+            <Checkbox
+              checked={shouldRandomizePrompt}
+              label="Randomize Prompt"
+              onChange={(e) => {
+                setShouldRandomizePrompt(e.currentTarget.checked);
+              }}
+            />
           </Flex>
 
           {selectedPrompt.name !== "Custom" && (
@@ -727,14 +694,14 @@ function App() {
                   return;
                 }
                 const actualProvider = availableProviders.generative.find(
-                  (provider) => provider === newSelectedProvider
+                  (provider) => provider === newSelectedProvider,
                 );
                 if (!actualProvider) {
                   return;
                 }
                 setSelectedGenerativeProvider(actualProvider);
                 setSelectedGenerativeModel(
-                  availableModels[actualProvider]?.[0]?.id
+                  availableModels[actualProvider]?.[0]?.id,
                 );
               }}
               renderOption={({ option, checked }) => (
@@ -762,7 +729,7 @@ function App() {
                   (model) => ({
                     label: model.name,
                     value: model.id,
-                  })
+                  }),
                 )}
                 checkIconPosition="right"
                 onChange={(newSelectedModel) => {
@@ -804,14 +771,14 @@ function App() {
                     return;
                   }
                   const actualVoiceProvider = availableProviders.voice.find(
-                    (provider) => provider === newSelectedVoiceProvider
+                    (provider) => provider === newSelectedVoiceProvider,
                   );
                   if (!actualVoiceProvider) {
                     return;
                   }
                   setSelectedVoiceProvider(actualVoiceProvider);
                   setSelectedVoice(
-                    availableVoices[actualVoiceProvider]?.[0]?.id || ""
+                    availableVoices[actualVoiceProvider]?.[0]?.id || "",
                   );
                 }}
                 renderOption={({ option, checked }) => (
@@ -838,7 +805,7 @@ function App() {
                   (model) => ({
                     label: model.name,
                     value: model.id,
-                  })
+                  }),
                 )}
                 checkIconPosition="right"
                 onChange={(newSelectedVoice) => {
@@ -864,6 +831,16 @@ function App() {
               ></Select>
             </Flex>
           )}
+
+          <Flex direction="column" align={"flex-end"}>
+            <Checkbox
+              checked={shouldRandomizeVoice}
+              label="Randomize Voice"
+              onChange={(e) => {
+                setShouldRandomizeVoice(e.currentTarget.checked);
+              }}
+            />
+          </Flex>
         </Flex>
 
         <Flex w={{ base: "100%", md: "30%" }} direction="column" gap="1rem">

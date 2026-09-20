@@ -6,14 +6,10 @@ import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
 
 // nodeJS specific
+import { Readable } from "node:stream";
 import path from "path";
 import fs from "fs";
 import { glob } from "glob";
-
-// CF specific
-// import { H } from "@highlight-run/cloudflare";
-import { H } from "@highlight-run/node";
-import * as traceloop from "@traceloop/node-server-sdk";
 
 import z from "zod";
 
@@ -24,33 +20,10 @@ import {
 } from "./providers/index";
 import { env } from "hono/adapter";
 import { GenerativeModel } from "./providers/generative/_types";
-import { ReadableStream } from "stream/web";
-
-const HIGHLIGHT_PROJECT_ID = "lgxrjr4g";
-
-// CF specific
-// const highlightMetaData = { HIGHLIGHT_PROJECT_ID };
 
 const app = new Hono();
 
-app.use("/*", cors() as any);
-
-const telemetryMiddleware = async (c: any, next: any) => {
-  console.log("Initializing middleware");
-
-  H.init(
-    { projectID: HIGHLIGHT_PROJECT_ID }
-    // CF specific
-    // c.req.raw, highlightMetaData, c.executionCtx
-  );
-  traceloop.initialize({
-    appName: "twitch_voice_rewards",
-    baseUrl: "https://otel.highlight.io:4318",
-  });
-
-  await next();
-};
-app.use("/*", telemetryMiddleware as any);
+app.use("/*", cors());
 
 const promptRequestSchema = z.object({
   initialMessage: z.string(),
@@ -69,7 +42,7 @@ app.get("/providers", async (c) => {
     JSON.stringify({
       voice: Object.keys(aiProviders.voice),
       generative: Object.keys(aiProviders.generative),
-    })
+    }),
   );
 
   return response;
@@ -86,9 +59,9 @@ app.get("/models", async (c) => {
 
           return result;
         },
-        {} as Record<string, GenerativeModel[]>
-      )
-    )
+        {} as Record<string, GenerativeModel[]>,
+      ),
+    ),
   );
 
   return response;
@@ -105,9 +78,9 @@ app.get("/voices", async (c) => {
 
           return result;
         },
-        {} as Record<string, GenerativeModel[]>
-      )
-    )
+        {} as Record<string, GenerativeModel[]>,
+      ),
+    ),
   );
 
   return response;
@@ -141,16 +114,6 @@ app.post("/prompt", async (c) => {
       });
     }
 
-    const generativeResponse = await generativeProvider.getPromptResponse(
-      `When I tell you a username, ${validatedRequest.prompt}
-
-      Limit the description to 30 seconds. Make sure to always reference them as they or their.`,
-      validatedRequest.generativeModel,
-      validatedRequest.username
-    );
-
-    console.log({ generativeResponse });
-
     const voiceProvider = aiProviders.voice[validatedRequest.voiceProvider];
 
     if (!voiceProvider) {
@@ -159,33 +122,24 @@ app.post("/prompt", async (c) => {
       });
     }
 
+    const voice = voiceProvider.getVoiceById(validatedRequest.voiceId);
+
+    const generativeResponse = await generativeProvider.getPromptResponse(
+      `When I tell you a username, ${validatedRequest.prompt}
+
+      Limit the description to 30 seconds. Make sure to always reference them as they or their.`,
+      validatedRequest.generativeModel,
+      validatedRequest.username,
+      voice.name,
+    );
+
+    console.log({ generativeResponse });
+
     // TODO: See why this times out? or if it even does?
     const voiceResponse = await voiceProvider.textToSpeech(
       `${validatedRequest.initialMessage} ${generativeResponse}`,
-      validatedRequest.voiceId
+      validatedRequest.voiceId,
     );
-
-    // const reader = voiceResponse.getReader();
-
-    // const readableStream = new ReadableStream<Uint8Array>({
-    //   start(controller) {
-    //     return pump();
-
-    //     function pump(): any {
-    //       return reader.read().then(({ done, value }) => {
-    //         // When no more data needs to be consumed, close the stream
-    //         if (done) {
-    //           controller.close();
-    //           return;
-    //         }
-
-    //         // Enqueue the next data chunk into our target stream
-    //         controller.enqueue(value);
-    //         return pump();
-    //       });
-    //     }
-    //   },
-    // });
 
     const today = new Date();
     const year = today.getFullYear() + "";
@@ -196,21 +150,17 @@ app.post("/prompt", async (c) => {
     await fs.promises.mkdir(fileDir, { recursive: true });
 
     const existingFiles = await glob(
-      path.resolve(fileDir, `${validatedRequest.username}-*`)
+      path.resolve(fileDir, `${validatedRequest.username}-*`),
     );
     const increment = existingFiles.length;
     const fileName = `${validatedRequest.username}-${increment}.mp3`;
     const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
     console.log("voiceResponse", Object.keys(voiceResponse));
-    voiceResponse.pipe(fileStream);
+    Readable.fromWeb(voiceResponse as any).pipe(fileStream);
 
     const response = c.body(voiceResponse);
 
     return response;
-
-    // CF specific
-    // H.sendResponse(response);
-    // return response;
   } catch (e: any) {
     console.log(e.message);
 
@@ -224,6 +174,21 @@ app.post("/prompt", async (c) => {
   }
 });
 
+app.onError((err, c) => {
+  // 1. Log the full stack trace to your server stdout/stderr
+  console.error("=== Unhandled Exception ===");
+  console.error(err); // Passing the error object itself logs the full stack trace
+
+  // 2. Safely forward HTTPException details if thrown explicitly
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+
+  // 3. Return a generic 500 error to the client (to avoid leaking internal info)
+  // Optional: In development, you can return c.json({ error: err.message, stack: err.stack }, 500)
+  return c.text("Internal Server Error", 500);
+});
+
 const port = 3000;
 console.log(`Server is running on port ${port}`);
 
@@ -231,6 +196,3 @@ serve({
   fetch: app.fetch,
   port,
 });
-
-// CF specific
-// export default app;

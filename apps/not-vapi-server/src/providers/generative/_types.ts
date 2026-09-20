@@ -10,7 +10,8 @@ export type GenerativeProviderMethods = AiProvider & {
   getPromptResponse: (
     prompt: string,
     model: string,
-    userName: string
+    userName: string,
+    voiceName: string,
   ) => Promise<string>;
 };
 
