@@ -16,6 +16,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.5,
       },
       {
         id: "8589c9bb49c5444f9443d3d39ecc8370",
@@ -23,6 +24,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.2,
       },
 
       {
@@ -31,6 +33,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -39,6 +42,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "au",
+        gain: 1.0,
       },
 
       {
@@ -47,6 +51,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "uk",
+        gain: 1.0,
       },
 
       {
@@ -55,6 +60,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -63,6 +69,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -71,6 +78,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -79,6 +87,7 @@ export class OpenRouterFishProvider
         gender: "female",
         language: "en",
         accent: "au",
+        gain: 2.0,
       },
 
       {
@@ -87,6 +96,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -95,6 +105,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "uk",
+        gain: 1.4,
       },
 
       {
@@ -103,6 +114,7 @@ export class OpenRouterFishProvider
         gender: "female",
         language: "en",
         accent: "uk",
+        gain: 1.0,
       },
 
       {
@@ -111,6 +123,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "uk",
+        gain: 1.0,
       },
 
       {
@@ -119,6 +132,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "uk",
+        gain: 1.0,
       },
 
       {
@@ -127,6 +141,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
 
       {
@@ -135,6 +150,7 @@ export class OpenRouterFishProvider
         gender: "male",
         language: "en",
         accent: "us",
+        gain: 1.0,
       },
     ];
   };

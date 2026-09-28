@@ -11,6 +11,7 @@ export type VoiceProviderMethods = VoiceProvider & {
 export interface Voice {
   id: string;
   name: string;
+  gain: number;
   gender?: "male" | "female" | string;
   language?: string;
   accent?: string;

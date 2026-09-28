@@ -20,6 +20,8 @@ import {
 } from "./providers/index";
 import { env } from "hono/adapter";
 import { GenerativeModel } from "./providers/generative/_types";
+import { consumeCustomStream } from "./utils/readable-stream";
+import { adjustAudioGain } from "./utils/adjust-audio-gain";
 
 const app = new Hono();
 
@@ -141,27 +143,29 @@ app.post("/prompt", async (c) => {
       validatedRequest.voiceId,
     );
 
-    const today = new Date();
-    const year = today.getFullYear() + "";
-    const monthNumber = today.getMonth() + 1;
-    const month = monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
+    // TODO: Save to a file, but we probably want to do that after we add video to the results
+    // const today = new Date();
+    // const year = today.getFullYear() + "";
+    // const monthNumber = today.getMonth() + 1;
+    // const month = monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
 
-    const fileDir = path.resolve(__dirname, "../archives/voice/", year, month);
-    await fs.promises.mkdir(fileDir, { recursive: true });
+    // const fileDir = path.resolve(__dirname, "../archives/voice/", year, month);
+    // await fs.promises.mkdir(fileDir, { recursive: true });
 
-    const existingFiles = await glob(
-      path.resolve(fileDir, `${validatedRequest.username}-*`),
-    );
-    const increment = existingFiles.length;
-    // const fileName = `${validatedRequest.username}-${increment}.mp3`;
-    // const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
-    // console.log("voiceResponse", typeof voiceResponse);
-    // Readable.fromWeb
-    // (voiceResponse as any).pipe(fileStream);
+    // const existingFiles = await glob(
+    //   path.resolve(fileDir, `${validatedRequest.username}-*`),
+    // );
+    // const increment = existingFiles.length;
+    // // const fileName = `${validatedRequest.username}-${increment}.mp3`;
+    // // const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
+    // // console.log("voiceResponse", typeof voiceResponse);
+    // // Readable.fromWeb
+    // // (voiceResponse as any).pipe(fileStream);
 
-    // const reader = voiceResponse.next();
+    const responseBuffer = await consumeCustomStream(voiceResponse);
+    const normalizedBuffer = await adjustAudioGain(responseBuffer, voice.gain);
 
-    const response = c.body(voiceResponse);
+    const response = c.body(normalizedBuffer);
 
     return response;
   } catch (e: any) {
