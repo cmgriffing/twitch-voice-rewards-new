@@ -112,6 +112,30 @@ export class OpenRouterFishProvider
         language: "en",
         accent: "uk",
       },
+
+      {
+        id: "44756fe54804466ab5b61b75a29c8200",
+        name: "Richard Ayoade",
+        gender: "male",
+        language: "en",
+        accent: "uk",
+      },
+
+      {
+        id: "b1d36a18f8d84bd59dead30474cbe3d7",
+        name: "Peter Griffin",
+        gender: "male",
+        language: "en",
+        accent: "us",
+      },
+
+      {
+        id: "9a619104fe734652b8fc2c6b5f4638c2",
+        name: "Bill Burr",
+        gender: "male",
+        language: "en",
+        accent: "us",
+      },
     ];
   };
 

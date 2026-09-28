@@ -159,6 +159,8 @@ app.post("/prompt", async (c) => {
     // Readable.fromWeb
     // (voiceResponse as any).pipe(fileStream);
 
+    // const reader = voiceResponse.next();
+
     const response = c.body(voiceResponse);
 
     return response;
