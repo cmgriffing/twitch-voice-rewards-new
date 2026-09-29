@@ -39,6 +39,8 @@ import {
 // definitely not the right port
 const apiBaseUrl = import.meta.env.API_URL || "http://localhost:3000";
 
+const DEBUGGING_THROTTLE_DURATION_MS = 300_000;
+
 interface ProvidersResponse {
   voice: string[];
   generative: string[];
@@ -128,6 +130,7 @@ function App() {
   const [currentUsername, setCurrentUsername] = useState("");
   const [shouldRandomizePrompt, setShouldRandomizePrompt] = useState(false);
   const [shouldRandomizeVoice, setShouldRandomizeVoice] = useState(false);
+  const debuggingThrottleMap = useRef<Record<string, number>>({});
 
   const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
 
@@ -335,12 +338,18 @@ function App() {
             try {
               console.log("MESSAGE:", { channel, userstate, message });
 
+              const throttleMap = debuggingThrottleMap.current;
+
               if (
-                userstate.username
-                // && !!userstate.subscriber
-                //  && userstate.username === "cmgriffing"
+                userstate.username &&
+                (!throttleMap[userstate.username] ||
+                  (throttleMap[userstate.username] &&
+                    throttleMap[userstate.username] >
+                      Date.now() - DEBUGGING_THROTTLE_DURATION_MS))
               ) {
                 addUserToQueue(userstate.username);
+                throttleMap[userstate.username] = Date.now();
+                debuggingThrottleMap.current = throttleMap;
               }
             } catch (e: unknown) {
               console.log("Error in MESSAGE:", e);
@@ -434,7 +443,7 @@ function App() {
             });
             audioRef.current.src = URL.createObjectURL(blob);
           }
-        } catch (e: any) {
+        } catch (e: Error | unknown) {
           console.log("failed fetching audio");
           // TODO: maybe add user to failed list to be able to re-add them
           setCurrentUsername("");
@@ -456,6 +465,27 @@ function App() {
     selectedVoice,
     customInitialMessage,
   ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentDebuggingThrottleMap = debuggingThrottleMap.current;
+      const newDebuggingThrottleMap: Record<string, number> = {};
+
+      Object.entries(currentDebuggingThrottleMap).forEach(
+        ([username, debounceTimestamp]) => {
+          if (Date.now() - debounceTimestamp < DEBUGGING_THROTTLE_DURATION_MS) {
+            newDebuggingThrottleMap[username] = debounceTimestamp;
+          }
+        },
+      );
+      debuggingThrottleMap.current = newDebuggingThrottleMap;
+      // Hourly timer
+    }, 3_600_000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <>
