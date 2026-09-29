@@ -355,7 +355,7 @@ function App() {
                 userstate.username &&
                 (!throttleMap[userstate.username] ||
                   (throttleMap[userstate.username] &&
-                    throttleMap[userstate.username] >
+                    throttleMap[userstate.username] <
                       Date.now() - DEBUGGING_THROTTLE_DURATION_MS))
               ) {
                 if (ignoredUsers.includes(userstate.username)) {
