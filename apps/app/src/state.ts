@@ -85,3 +85,5 @@ export const shouldRandomizeVoiceState = atomWithStorage(
   "shouldRandomizeVoice",
   false,
 );
+
+export const ignoredUsersState = atomWithStorage<string[]>("ignoredUsers", []);

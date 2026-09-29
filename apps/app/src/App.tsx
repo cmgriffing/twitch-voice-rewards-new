@@ -11,6 +11,8 @@ import {
   Drawer,
   List,
   ActionIcon,
+  InputWrapper,
+  InputLabel,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconCheck, IconTrash } from "@tabler/icons-react";
@@ -36,6 +38,7 @@ import {
   selectedVoiceState,
   shouldRandomizeVoiceState,
   shouldRandomizePromptState,
+  ignoredUsersState,
 } from "./state";
 
 // definitely not the right port
@@ -123,6 +126,7 @@ function App() {
   const [shouldRandomizeVoice, setShouldRandomizeVoice] = useAtom(
     shouldRandomizeVoiceState,
   );
+  const [ignoredUsers, setIgnoredUsers] = useAtom(ignoredUsersState);
 
   const [isDebugging, setIsDebugging] = useState(false);
   const [manualUsername, setManualUsername] = useState("");
@@ -136,6 +140,8 @@ function App() {
   >({});
   const [userQueue, setUserQueue] = useState<string[]>([]);
   const [currentUsername, setCurrentUsername] = useState("");
+  const [newIgnoredUser, setNewIgnoredUser] = useState("");
+
   const debuggingThrottleMap = useRef<Record<string, number>>({});
 
   const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
@@ -338,7 +344,6 @@ function App() {
           });
         }
 
-        // TODO: remove this?
         if (isDebugging) {
           client.on("message", async (channel, userstate, message) => {
             try {
@@ -353,6 +358,10 @@ function App() {
                     throttleMap[userstate.username] >
                       Date.now() - DEBUGGING_THROTTLE_DURATION_MS))
               ) {
+                if (ignoredUsers.includes(userstate.username)) {
+                  return;
+                }
+
                 addUserToQueue(userstate.username);
                 throttleMap[userstate.username] = Date.now();
                 debuggingThrottleMap.current = throttleMap;
@@ -384,6 +393,7 @@ function App() {
     shouldTriggerSubs,
     shouldTriggerRaids,
     minRaiders,
+    ignoredUsers,
   ]);
 
   useEffect(() => {
@@ -965,6 +975,60 @@ function App() {
                   />
                 </Flex>
               )}
+            </Flex>
+
+            <hr />
+
+            <Flex direction="column">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+
+                  if (newIgnoredUser) {
+                    setIgnoredUsers([...ignoredUsers, newIgnoredUser]);
+                    setNewIgnoredUser("");
+                  }
+                }}
+              >
+                <InputWrapper>
+                  <InputLabel>Ignored Users</InputLabel>
+                  <Flex>
+                    <Input
+                      value={newIgnoredUser}
+                      onChange={(e) => {
+                        setNewIgnoredUser(e.currentTarget.value);
+                      }}
+                    />
+                    <Button type="submit">Add</Button>
+                  </Flex>
+                </InputWrapper>
+              </form>
+              <List listStyleType="none" w="100%" mt="1rem" spacing={"0.5rem"}>
+                {ignoredUsers.map((ignoredUser) => (
+                  <li key={ignoredUser}>
+                    <Flex
+                      direction={"row"}
+                      justify={"space-between"}
+                      w="100%"
+                      mb="0.5rem"
+                    >
+                      {ignoredUser}{" "}
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="red"
+                        onClick={() => {
+                          setIgnoredUsers(
+                            ignoredUsers.filter((u) => u !== ignoredUser),
+                          );
+                        }}
+                      >
+                        <IconTrash />
+                      </Button>
+                    </Flex>
+                  </li>
+                ))}
+              </List>
             </Flex>
           </Flex>
         </Flex>
