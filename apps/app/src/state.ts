@@ -33,46 +33,55 @@ export const availablePrompts: {
 
 export const selectedPromptState = atomWithStorage(
   "selectedPrompt",
-  availablePrompts[0]
+  availablePrompts[0],
 );
 export const customInitialMessageState = atomWithStorage(
   "customInitialMessage",
-  ""
+  "",
 );
 export const customPromptState = atomWithStorage("customPrompt", "");
 
 export const selectedGenerativeProviderState = atomWithStorage(
   "selectedGenerativeProvider",
-  ""
+  "",
 );
 export const selectedGenerativeModelState = atomWithStorage(
   "selectedGenerativeModel",
-  ""
+  "",
 );
 export const selectedVoiceProviderState = atomWithStorage(
   "selectedVoiceProvider",
-  ""
+  "",
 );
 export const selectedVoiceState = atomWithStorage("selectedVoice", "");
 
 export const shouldTriggerBitsState = atomWithStorage(
   "shouldTriggerBits",
-  true
+  true,
 );
 export const minBitsState = atomWithStorage("minBits", 100);
 
 export const shouldTriggerSubsState = atomWithStorage(
   "shouldTriggerSubs",
-  false
+  false,
 );
 
 export const shouldTriggerGiftsState = atomWithStorage(
   "shouldTriggerGifts",
-  false
+  false,
 );
 
 export const shouldTriggerRaidsState = atomWithStorage(
   "shouldTriggerRaids",
-  false
+  false,
 );
 export const minRaidersState = atomWithStorage("minRaiders", 10);
+
+export const shouldRandomizePromptState = atomWithStorage(
+  "shouldRandomizePrompt",
+  false,
+);
+export const shouldRandomizeVoiceState = atomWithStorage(
+  "shouldRandomizeVoice",
+  false,
+);

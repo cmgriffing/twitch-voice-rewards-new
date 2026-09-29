@@ -34,6 +34,8 @@ import {
   selectedGenerativeModelState,
   selectedVoiceProviderState,
   selectedVoiceState,
+  shouldRandomizeVoiceState,
+  shouldRandomizePromptState,
 } from "./state";
 
 // definitely not the right port
@@ -115,6 +117,12 @@ function App() {
     shouldTriggerRaidsState,
   );
   const [minRaiders, setMinRaiders] = useAtom(minRaidersState);
+  const [shouldRandomizePrompt, setShouldRandomizePrompt] = useAtom(
+    shouldRandomizePromptState,
+  );
+  const [shouldRandomizeVoice, setShouldRandomizeVoice] = useAtom(
+    shouldRandomizeVoiceState,
+  );
 
   const [isDebugging, setIsDebugging] = useState(false);
   const [manualUsername, setManualUsername] = useState("");
@@ -128,8 +136,6 @@ function App() {
   >({});
   const [userQueue, setUserQueue] = useState<string[]>([]);
   const [currentUsername, setCurrentUsername] = useState("");
-  const [shouldRandomizePrompt, setShouldRandomizePrompt] = useState(false);
-  const [shouldRandomizeVoice, setShouldRandomizeVoice] = useState(false);
   const debuggingThrottleMap = useRef<Record<string, number>>({});
 
   const [queueOpened, { open: openQueue, close: closeQueue }] = useDisclosure();
