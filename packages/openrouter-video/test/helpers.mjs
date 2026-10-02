@@ -97,7 +97,8 @@ export function transport(options = {}) {
     if (request.method === "POST" && url.pathname.endsWith("/videos")) {
       const body = await request.json();
       submissions.push(body);
-      await options.onSubmit?.(body, submissions.length);
+      const response = await options.onSubmit?.(body, submissions.length);
+      if (response instanceof Response) {return response;}
       if (options.lostSubmission && !lost) {
         lost = true;
         throw new TypeError("lost response with secret TEST_KEY");

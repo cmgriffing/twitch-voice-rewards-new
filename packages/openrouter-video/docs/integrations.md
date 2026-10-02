@@ -17,8 +17,13 @@ as `frame_images` with `image_url` and `frame_type`. A verified audio route uses
 `inputReferences[{type:'audio_url', audioUrl:{url}}]`. Authenticated download uses the
 content endpoint rather than trusting an arbitrary provider URL.
 
-SDK retries are disabled for all calls. The library implements bounded GET retries;
-it never retries a video POST. Synthetic transport tests inspect authentication,
+SDK retries are disabled for all calls. The library retries transient status GET failures
+within the per-job polling deadline, with bounded retry bursts and backoff between bursts.
+Status 404s for accepted jobs use the same budget to tolerate possible delayed visibility;
+other endpoints retain their ordinary retry policy. This is a client recovery policy,
+not a documented provider guarantee that a missing job will become visible.
+Download GET retries are bounded; it never retries a video POST. Synthetic transport
+tests inspect authentication,
 multipart timing fields, exact serialized frame/audio fields, and job ordering.
 
 Authoritative references:
@@ -63,3 +68,17 @@ channel and below 20 in green/blue. This is an encoding-tolerant synthetic asser
 not a byte-equality test or a universal real-provider visual threshold.
 
 Live-smoke status: **not run**. Automated tests consume no OpenRouter credits.
+
+## Targeted live continuation check
+
+On 2026-10-02, a live `POST /videos` with `previous_job_id` referencing a completed
+Seedance 2.0 Mini job, duration 4, resolution 720p, aspect ratio 16:9, and no frame or
+audio references was rejected with HTTP 400:
+
+```text
+bytedance/seedance-2.0-mini-20260811 does not support previous_job_id
+```
+
+No continuation job was accepted. OpenRouter's general continuation field cannot be
+used for this model version. This targeted check does not constitute a full pipeline
+smoke or verify trusted provider-returned ending frames.

@@ -187,12 +187,33 @@ job ID/status. No provider percentage is invented. Completion occurs after final
 publication and temporary cleanup.
 
 Catch `VideoError` and inspect `code` and safe `context`: stage, run/segment/job IDs,
-published assets, completed segments, and relevant source intervals. SDK transport
-errors and credentials are not serialized into failure messages. Your prompt/transcript
+published assets, completed segments, and relevant source intervals. Submission failures
+also include `submission` (model, requested duration, output shape, first-frame URL) and
+`providerError` (HTTP status, error code/message, and available upstream provider
+code/message). Provider messages are bounded and credentials are redacted; SDK transport
+objects, headers, and complete response bodies are excluded. Your prompt/transcript
 and asset URLs are part of results; signed URL query parameters should be treated as
 access grants when sharing results.
 
-Polling and authenticated content-download retries are bounded and target the same job.
+Terminal jobs (`failed`, `cancelled`, `expired`) stop the run as `JOB_TERMINAL`.
+When the status response includes an `error` string, its bounded, credential-redacted
+explanation is included in the error message and `context.jobError`. A terminal job
+with no explanation retains the status-only message. No replacement job is submitted.
+
+Polling defaults to a **20-minute budget per segment** (`pollTimeoutMs`), including
+status requests and retry delays. Pending/in-progress jobs and transient status failures
+(network errors, request timeouts, HTTP 408/429/5xx) continue within that budget. A 404
+from the status endpoint for an accepted job is also retried within the same budget,
+allowing for delayed job visibility. If it stays missing, the timeout preserves the
+job ID and last 404 in `context.providerError`. This does not retry 404s on other endpoints.
+Each status burst uses `retries` (default 3); exhausted bursts back off up to 30 seconds and
+continue checking the same job. Successful status responses restore `pollIntervalMs`
+(default 2 seconds). The deadline also stops an in-flight status request or retry wait.
+`POLL_TIMEOUT` means the budget expired; non-retryable status errors stop immediately
+as `POLL_REQUEST`, with available redacted details in `context.providerError`.
+To allow 30 minutes per segment, use `new OpenRouterVideo({ apiKey, pollTimeoutMs: 30 * 60_000 })`.
+
+Authenticated content-download retries are bounded and target the same job.
 Submission POSTs have SDK retries disabled. A lost or undecodable submission response
 is `AMBIGUOUS_SUBMISSION`; investigate the provider before intentionally starting a new
 run. Cancellation stops local processes and future submissions, with known job context;

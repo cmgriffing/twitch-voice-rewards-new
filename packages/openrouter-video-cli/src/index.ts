@@ -25,6 +25,7 @@ serve     --asset-dir DIR [--port 8080] [--prefix /assets] [--host 127.0.0.1]
 
 Output: --size WIDTHxHEIGHT OR --resolution 720p --aspect-ratio 16:9; --fps 24
 Optional: --initial-image HTTPS_URL --generate-audio --json
+Polling: --poll-timeout-seconds 1200 (per segment, including status retries)
 STT: --window-seconds 60 --overlap-seconds 2 --max-stt-bytes 20000000 --language en
 Hosting and tunnels are caller-managed. Public asset URLs must be directly downloadable
 and valid through each provider job. Transcript mode does not guarantee lip-sync.
@@ -75,6 +76,7 @@ export async function runCli(
         "window-seconds": { type: "string" },
         "overlap-seconds": { type: "string" },
         "max-stt-bytes": { type: "string" },
+        "poll-timeout-seconds": { type: "string" },
         language: { type: "string" },
       },
     });
@@ -131,10 +133,22 @@ export async function runCli(
     if (!apiKey) {
       throw new Error("Set OPENROUTER_API_KEY");
     }
+    const pollTimeoutSeconds =
+      v["poll-timeout-seconds"] === undefined
+        ? undefined
+        : number("poll-timeout-seconds", 0);
+    if (
+      pollTimeoutSeconds !== undefined &&
+      (pollTimeoutSeconds <= 0 || !Number.isFinite(pollTimeoutSeconds * 1000))
+    ) {
+      throw new Error("--poll-timeout-seconds must be positive and finite");
+    }
     const client = (
       dependencies.createClient ?? ((options) => new OpenRouterVideo(options))
     )({
       apiKey,
+      pollTimeoutMs:
+        pollTimeoutSeconds === undefined ? undefined : pollTimeoutSeconds * 1000,
       tools: {
         ffmpeg: environment.FFMPEG_PATH,
         ffprobe: environment.FFPROBE_PATH,

@@ -6,20 +6,54 @@ server or web application. Build from the repository root:
 ```sh
 pnpm install
 pnpm exec turbo build --filter=@repo/openrouter-video-cli
-export OPENROUTER_API_KEY='your-key'
-node packages/openrouter-video-cli/dist/bin.js --help
 ```
 
-Set `FFMPEG_PATH` / `FFPROBE_PATH` when the tools are not on PATH. Pass `--json` to
-`models`, `plan`, or `generate` for parseable stdout. Human progress and errors go to
-stderr. Errors exit 1; SIGINT aborts local work and exits 130, preserving known provider
-job context. It does not claim to cancel an accepted remote job.
+## Environment
+
+`packages/openrouter-video-cli/.env.schema` declares `OPENROUTER_API_KEY` as required
+and sensitive, plus optional `FFMPEG_PATH` / `FFPROBE_PATH` tool overrides. Put the key
+in the gitignored `packages/openrouter-video-cli/.env`:
+
+```sh
+OPENROUTER_API_KEY=sk-or-…
+```
+
+Invoke the built CLI through `varlock run --inject vars` so the schema is validated and
+the resolved variables are injected before the CLI starts. Varlock is a devDependency;
+run it with `pnpm exec varlock`, or plain `varlock` where the package's
+`node_modules/.bin` is on PATH. From the package directory:
+
+```sh
+varlock run --inject vars -- node dist/bin.js --help
+```
+
+From the repository root, `--path` points varlock at the package so it finds the
+package-local schema and `.env`:
+
+```sh
+varlock run --inject vars --path packages/openrouter-video-cli/ -- \
+  node packages/openrouter-video-cli/dist/bin.js --help
+```
+
+`--inject vars` omits varlock's serialized `__VARLOCK_ENV` config blob, so the
+ffmpeg/ffprobe subprocesses the CLI spawns cannot inherit it. Because the key is
+`@required`, every wrapped command — including `serve` and `--help` — needs a resolvable
+key; varlock exits non-zero before the CLI starts otherwise. Direct
+`node dist/bin.js` invocation keeps working with the key exported in the shell, and the
+CLI's existing `Set OPENROUTER_API_KEY` check still guards paid commands.
+
+Set `FFMPEG_PATH` / `FFPROBE_PATH` in `.env` when the tools are not on PATH. Pass
+`--json` to `models`, `plan`, or `generate` for parseable stdout. Human progress and
+errors go to stderr. Errors exit 1; SIGINT aborts local work and exits 130, preserving
+known provider job context. It does not claim to cancel an accepted remote job.
 
 ## Discover and plan
 
 ```sh
-node packages/openrouter-video-cli/dist/bin.js models --json
-node packages/openrouter-video-cli/dist/bin.js plan \
+varlock run --inject vars --path packages/openrouter-video-cli/ -- \
+  node packages/openrouter-video-cli/dist/bin.js models --json
+varlock run --inject vars --path packages/openrouter-video-cli/ -- \
+  node packages/openrouter-video-cli/dist/bin.js plan \
   --audio narration.wav --model your/model --stt-model openai/whisper-1 \
   --resolution 720p --aspect-ratio 16:9 --fps 24 --json > plan.json
 ```
@@ -43,7 +77,8 @@ Optional STT controls: `--window-seconds 60 --overlap-seconds 2 --max-stt-bytes 
 Start local serving in one terminal:
 
 ```sh
-node packages/openrouter-video-cli/dist/bin.js serve \
+varlock run --inject vars --path packages/openrouter-video-cli/ -- \
+  node packages/openrouter-video-cli/dist/bin.js serve \
   --asset-dir ./video-assets --port 8080 --prefix /assets
 ```
 
@@ -58,7 +93,8 @@ and byte ranges, and confines requests to the asset directory.
 ## Generate
 
 ```sh
-node packages/openrouter-video-cli/dist/bin.js generate \
+varlock run --inject vars --path packages/openrouter-video-cli/ -- \
+  node packages/openrouter-video-cli/dist/bin.js generate \
   --audio narration.wav --model your/model --stt-model openai/whisper-1 \
   --resolution 720p --aspect-ratio 16:9 --fps 24 \
   --prompt 'A calm landscape beneath narration.' \
@@ -78,6 +114,33 @@ Generation replans the source, so STT and video charges may both apply. Submissi
 responses lost in transit are reported as ambiguous without an automatic replacement
 POST. Completed assets remain available after later failures. There is no application
 integration or cross-process resume.
+
+Submission errors include OpenRouter's rejection message and selected upstream provider
+details in `context.providerError`. `context.submission` identifies the failed request's
+model, duration, output shape, and inherited frame URL. Errors remain on stderr even with
+`--json`: append `2> generate.log` to capture them separately from `result.json`.
+Rerunning `generate` starts a new run and can charge again for completed segments.
+
+Polling allows **20 minutes per segment** by default, including transient status failures
+and retry delays. Use `--poll-timeout-seconds 1800` on `generate` to allow 30 minutes per
+segment. Temporary network errors, request timeouts, and HTTP 408/429/5xx responses are
+retried on the same job with backoff within that budget. Permanent status errors are
+reported as `POLL_REQUEST`; `POLL_TIMEOUT` means the per-segment deadline expired.
+A status 404 for an accepted job is also retried within that deadline; a persistent
+404 is included with the known job ID in the timeout diagnostics.
+
+When an accepted job ends as `failed`, `cancelled`, or `expired`, `JOB_TERMINAL` reports
+the status response's error explanation in both the message and `context.jobError`
+when available. For example, a no-output/content-filtering failure is reported directly
+instead of only saying that the job failed. The explanation is bounded and credentials
+are redacted. A terminal job failure does not trigger another paid submission.
+
+For Seedance 2.0, a later submission can reject a photorealistic face in the inherited
+frame even when earlier text-to-video generation succeeded. BytePlus documents
+[portrait input restrictions](https://docs.byteplus.com/en/docs/modelark/seedance-portrait-asset-guide)
+and requires original provider outputs for its trusted-output path. Locally extracted,
+re-encoded ending PNGs should not be assumed to qualify. Check the provider error before
+changing the prompt or model; an advertised duration alone does not explain a rejection.
 
 See [SDK usage](../openrouter-video/README.md),
 [integration evidence](../openrouter-video/docs/integrations.md), and the

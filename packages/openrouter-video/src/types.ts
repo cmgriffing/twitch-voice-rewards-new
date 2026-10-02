@@ -202,9 +202,18 @@ export type ErrorCode =
   | "SUBMISSION"
   | "AMBIGUOUS_SUBMISSION"
   | "JOB_TERMINAL"
+  | "POLL_REQUEST"
   | "POLL_TIMEOUT"
   | "DOWNLOAD"
   | "CANCELLED";
+export interface ProviderErrorDetails {
+  status: number;
+  code?: string | number;
+  message?: string;
+  providerName?: string;
+  providerCode?: string | number;
+  providerMessage?: string;
+}
 export interface FailureContext {
   runId?: string;
   stage?: Stage;
@@ -213,6 +222,18 @@ export interface FailureContext {
   jobStatus?: string;
   assetKey?: string;
   interval?: { start: number; end: number };
+  /** Bounded, credential-redacted error from a terminal job response. */
+  jobError?: string;
+  /** Selected, credential-redacted response fields; never the SDK transport object. */
+  providerError?: ProviderErrorDetails;
+  submission?: {
+    model: string;
+    duration: number;
+    size?: string;
+    resolution?: string;
+    aspectRatio?: string;
+    frameImageUrl?: string;
+  };
   completedSegments?: SegmentResult[];
   publishedAssets?: AssetDescriptor[];
 }

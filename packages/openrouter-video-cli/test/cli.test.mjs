@@ -96,6 +96,33 @@ test("models and plan dispatch through SDK public API and emit parseable JSON", 
   assert.equal(JSON.parse(plan.stdout).segments[0].mode, "transcript");
   assert.ok(plan.stderr.includes("charges"));
 });
+test("polling timeout option reaches the client and rejects invalid budgets before creation", async () => {
+  for (const [flags, timeout] of [
+    [[], undefined],
+    [["--poll-timeout-seconds", "1800"], 1_800_000],
+    [["--poll-timeout-seconds", "0.5"], 500],
+  ]) {
+    const out = capture();
+    assert.equal(await runCli(["models", "--json", ...flags], env, out.io, undefined, {
+      createClient: (options) => {
+        assert.equal(options.pollTimeoutMs, timeout);
+        return fake();
+      },
+    }), 0);
+  }
+  for (const value of ["0", "-1", "", "NaN", "Infinity"]) {
+    const out = capture();
+    let created = false;
+    assert.equal(await runCli(["models", "--poll-timeout-seconds", value], env, out.io, undefined, {
+      createClient: () => {
+        created = true;
+        return fake();
+      },
+    }), 1);
+    assert.equal(created, false);
+    assert.match(out.stderr, /--poll-timeout-seconds/);
+  }
+});
 test("prompt-file generation prints progress on stderr, final JSON on stdout", async () => {
   const dir = await mkdtemp(join(tmpdir(), "cli-prompt-"));
   try {
@@ -201,6 +228,28 @@ test("interruption propagates signal and reports accepted job without claiming r
   assert.ok(out.stderr.includes("accepted-job"));
   assert.ok(out.stderr.includes("remote job may still run"));
   assert.equal(out.stdout, "");
+});
+test("JSON-mode submission failures report provider details on stderr", async () => {
+  const out = capture();
+  const context = {
+    segmentIndex: 2,
+    providerError: { status: 400, message: "Input image rejected" },
+    submission: { model: "fixture/video", duration: 4 },
+  };
+  const code = await runCli([
+    "generate", ...args, "--prompt", "Scene", "--asset-dir", "/tmp/assets",
+    "--base-url", "https://assets.example/", "--json",
+  ], env, out.io, undefined, {
+    createClient: () => fake({ generate: async () => {
+      throw new VideoError("SUBMISSION", "OpenRouter rejected the submission (HTTP 400): Input image rejected", context);
+    } }),
+  });
+  assert.equal(code, 1);
+  const failure = JSON.parse(out.stderr);
+  assert.equal(failure.code, "SUBMISSION");
+  assert.deepEqual(failure.context, context);
+  assert.equal(out.stdout, "");
+  assert.ok(!out.stderr.includes(env.OPENROUTER_API_KEY));
 });
 function get(port, path, headers = {}) {
   return new Promise((done, fail) => {

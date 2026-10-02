@@ -27,7 +27,8 @@ export function validateWords(
       !Number.isFinite(w.start) ||
       !Number.isFinite(w.end) ||
       w.start < 0 ||
-      w.end <= w.start ||
+      // Zero-length intervals are harmless to word-safe cutting; only inverted ones are invalid.
+      w.end < w.start ||
       w.end > duration ||
       w.start < previousStart
     ) {
@@ -80,18 +81,18 @@ export function planSegments(
     );
   }
   const max = durations[durations.length - 1]! * sampleRate;
-  // Union overlapping words, rounding outwards to avoid cutting through speech.
+  // Union genuinely overlapping words. Compare raw sample positions so that
+  // rounding outwards cannot turn back-to-back words into a fake chain of
+  // overlaps across continuous speech.
   const intervals: { start: number; end: number }[] = [];
   for (const w of words) {
-    const span = {
-      start: Math.floor(w.start * sampleRate),
-      end: Math.ceil(w.end * sampleRate),
-    };
+    const start = w.start * sampleRate;
+    const end = w.end * sampleRate;
     const last = intervals[intervals.length - 1];
-    if (last && span.start < last.end) {
-      last.end = Math.max(last.end, span.end);
+    if (last && start < last.end) {
+      last.end = Math.max(last.end, end);
     } else {
-      intervals.push(span);
+      intervals.push({ start, end });
     }
   }
   const result: SegmentPlan[] = [];
@@ -102,7 +103,7 @@ export function planSegments(
       (w) => w.start < endSample && w.end > endSample,
     );
     if (crossing) {
-      endSample = crossing.start;
+      endSample = Math.floor(crossing.start);
     }
     if (endSample <= startSample) {
       throw new VideoError(

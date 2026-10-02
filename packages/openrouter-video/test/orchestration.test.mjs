@@ -307,9 +307,50 @@ test("terminal job states stop future segments and retain job context", async ()
         c.render(plan, { assets: store(dir), prompt: "Scene" }),
         (error) =>
           error.code === "JOB_TERMINAL" &&
+          error.message === `OpenRouter job ended as ${terminal}` &&
           error.context.jobId === "fixture-1" &&
-          error.context.jobStatus === terminal,
+          error.context.jobStatus === terminal &&
+          error.context.jobError === undefined,
       );
+      assert.equal(t.submissions.length, 1);
+    }
+    assert.deepEqual(await readdir(dir), []);
+  }));
+test("terminal job explanations preserve provider reasons with credential-redacted context", async () =>
+  temporary(async (dir) => {
+    const plan = await client(dir, transport()).plan(input());
+    const reason = "Video generation completed with no output (content may have been filtered)";
+    for (const terminal of ["failed", "cancelled", "expired"]) {
+      const t = transport();
+      let polls = 0;
+      const c = client(dir, t, {
+        fetcher: (request) => {
+          if (request.url.endsWith("/videos/fixture-1")) {
+            polls++;
+            return Promise.resolve(new Response(JSON.stringify({
+              ...fixture.completed,
+              id: "fixture-1",
+              status: terminal,
+              error: ` ${reason}\nTEST_KEY sk-or-v1-other-key Bearer another-key `,
+            }), { headers: { "Content-Type": "application/json" } }));
+          }
+          return t.fetcher(request);
+        },
+      });
+      await assert.rejects(c.render(plan, { assets: store(dir), prompt: "Scene" }), (error) => {
+        const expected = `${reason} [REDACTED] [REDACTED] Bearer [REDACTED]`;
+        assert.equal(error.code, "JOB_TERMINAL");
+        assert.equal(error.message, `OpenRouter job ended as ${terminal}: ${expected}`);
+        assert.equal(error.context.jobError, expected);
+        assert.equal(error.context.jobId, "fixture-1");
+        assert.equal(error.context.jobStatus, terminal);
+        assert.equal(error.context.providerError, undefined);
+        assert.deepEqual(error.context.completedSegments, []);
+        assert.deepEqual(error.context.publishedAssets, []);
+        assert.ok(!JSON.stringify(error).includes("TEST_KEY"));
+        return true;
+      });
+      assert.equal(polls, 1);
       assert.equal(t.submissions.length, 1);
     }
     assert.deepEqual(await readdir(dir), []);
@@ -327,6 +368,303 @@ test("lost submission response is ambiguous and is never replaced", async () =>
     );
     assert.equal(t.submissions.length, 1);
     assert.deepEqual(await readdir(dir), []);
+  }));
+test("status failures beyond the retry burst recover on the same pending second-segment job", async () =>
+  temporary(async (dir) => {
+    const t = transport({ video }),
+      events = [];
+    let failures = 0;
+    const c = client(dir, t, {
+      fetcher: (request) => {
+        const attempt = request.url.endsWith("/videos/fixture-2") ? failures++ : -1;
+        if (attempt === 3) {
+          return Promise.reject(new TypeError("temporary connection failure TEST_KEY"));
+        }
+        if (attempt >= 0 && attempt < 3) {
+          const status = [503, 429, 408][attempt];
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: status, message: "temporary status outage" },
+          }), { status, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    const result = await c.render(plan, {
+      assets: store(dir),
+      prompt: "Scene",
+      onProgress: (event) => events.push(event),
+    });
+    assert.equal(result.segments.length, 2);
+    assert.equal(result.segments[1].jobId, "fixture-2");
+    assert.equal(t.submissions.length, 2);
+    assert.equal(failures, 6);
+    assert.ok(events.some((event) =>
+      event.segmentIndex === 1 && event.jobStatus === "pending"));
+    assert.equal(events.at(-1).stage, "completion");
+  }));
+test("accepted jobs missing from initial status requests recover without a replacement POST", async () =>
+  temporary(async (dir) => {
+    const t = transport({ video });
+    let requests = 0;
+    const c = client(dir, t, {
+      fetcher: (request) => {
+        if (request.url.endsWith("/videos/fixture-1") && requests++ < 5) {
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 404, message: "Job fixture-1 not found" },
+          }), { status: 404, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    const result = await c.render(plan, { assets: store(dir), prompt: "Scene" });
+    assert.equal(result.segments.length, 2);
+    assert.equal(result.segments[0].jobId, "fixture-1");
+    assert.equal(t.submissions.length, 2);
+    assert.equal(requests, 7);
+  }));
+test("accepted jobs that remain missing time out with the last 404 and original job ID", async () =>
+  temporary(async (dir) => {
+    const t = transport();
+    let requests = 0;
+    const c = client(dir, t, {
+      pollTimeoutMs: 200,
+      fetcher: (request) => {
+        if (request.url.endsWith("/videos/fixture-1")) {
+          requests++;
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 404, message: "Job fixture-1 not found" },
+          }), { status: 404, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    await assert.rejects(c.render(plan, { assets: store(dir), prompt: "Scene" }), (error) => {
+      assert.equal(error.code, "POLL_TIMEOUT");
+      assert.equal(error.context.stage, "polling");
+      assert.equal(error.context.jobId, "fixture-1");
+      assert.equal(error.context.jobStatus, "pending");
+      assert.equal(error.context.providerError.status, 404);
+      assert.equal(error.context.providerError.message, "Job fixture-1 not found");
+      return true;
+    });
+    assert.ok(requests > 4);
+    assert.equal(t.submissions.length, 1);
+    assert.deepEqual(await readdir(dir), []);
+  }));
+test("missing video content still fails without retrying or resubmitting", async () =>
+  temporary(async (dir) => {
+    const t = transport({ pendingPolls: 0 });
+    let downloads = 0;
+    const c = client(dir, t, {
+      fetcher: (request) => {
+        if (new URL(request.url).pathname.endsWith("/content")) {
+          downloads++;
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 404, message: "Content not found" },
+          }), { status: 404, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    await assert.rejects(c.render(plan, { assets: store(dir), prompt: "Scene" }), (error) => {
+      assert.equal(error.code, "DOWNLOAD");
+      assert.equal(error.context.jobId, "fixture-1");
+      assert.equal(error.context.jobStatus, "completed");
+      return true;
+    });
+    assert.equal(downloads, 1);
+    assert.equal(t.submissions.length, 1);
+  }));
+test("polling deadline bounds long intervals, retry backoff, and stalled requests", async () =>
+  temporary(async (dir) => {
+    const plan = await client(dir, transport()).plan(input());
+    for (const scenario of ["interval", "backoff", "request"]) {
+      const t = transport({ pendingPolls: Infinity });
+      let requestSignal;
+      const c = client(dir, t, {
+        pollTimeoutMs: 50,
+        pollIntervalMs: scenario === "interval" ? 1000 : 0,
+        retryDelayMs: scenario === "backoff" ? 1000 : 0,
+        fetcher: (request) => {
+          if (!request.url.endsWith("/videos/fixture-1")) {
+            return t.fetcher(request);
+          }
+          if (scenario === "backoff") {
+            return Promise.resolve(new Response(JSON.stringify({
+              error: { code: 503, message: "temporary outage" },
+            }), { status: 503, headers: { "Content-Type": "application/json" } }));
+          }
+          if (scenario === "request") {
+            requestSignal = request.signal;
+            return new Promise(() => {});
+          }
+          return t.fetcher(request);
+        },
+      });
+      await assert.rejects(c.render(plan, {
+        assets: store(dir),
+        prompt: "Scene",
+        // Also bounds the repro before the polling deadline is enforced in these paths.
+        signal: AbortSignal.timeout(2000),
+      }), (error) => {
+        assert.equal(error.code, "POLL_TIMEOUT", scenario);
+        assert.equal(error.message, "Polling deadline exceeded; remote job may still run");
+        assert.equal(error.context.jobId, "fixture-1");
+        assert.equal(error.context.jobStatus, "pending");
+        return true;
+      });
+      if (requestSignal) {assert.ok(requestSignal.aborted);}
+      assert.equal(t.submissions.length, 1);
+    }
+    assert.deepEqual(await readdir(dir), []);
+  }));
+test("persistent transient status failures continue until the polling deadline", async () =>
+  temporary(async (dir) => {
+    const t = transport();
+    let requests = 0;
+    const c = client(dir, t, {
+      pollTimeoutMs: 200,
+      retries: 0,
+      fetcher: (request) => {
+        if (request.url.endsWith("/videos/fixture-1")) {
+          requests++;
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 503, message: "temporary outage TEST_KEY" },
+          }), { status: 503, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    await assert.rejects(c.render(plan, { assets: store(dir), prompt: "Scene" }), (error) => {
+      assert.equal(error.code, "POLL_TIMEOUT");
+      assert.equal(error.message, "Polling deadline exceeded; remote job may still run");
+      assert.equal(error.context.providerError.status, 503);
+      assert.equal(error.context.providerError.message, "temporary outage [REDACTED]");
+      return true;
+    });
+    assert.ok(requests > 4);
+    assert.equal(t.submissions.length, 1);
+  }));
+test("caller cancellation interrupts status retry backoff and preserves the accepted job", async () =>
+  temporary(async (dir) => {
+    const controller = new AbortController();
+    const t = transport();
+    let timer, requests = 0;
+    const c = client(dir, t, {
+      retryDelayMs: 1000,
+      fetcher: (request) => {
+        if (request.url.endsWith("/videos/fixture-1")) {
+          requests++;
+          timer = setTimeout(() => controller.abort(), 20);
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 503, message: "temporary outage" },
+          }), { status: 503, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    try {
+      await assert.rejects(c.render(plan, {
+        assets: store(dir), prompt: "Scene", signal: controller.signal,
+      }), (error) => {
+        assert.equal(error.code, "CANCELLED");
+        assert.equal(error.context.jobId, "fixture-1");
+        assert.equal(error.context.jobStatus, "pending");
+        return true;
+      });
+      assert.equal(requests, 1);
+      assert.equal(t.submissions.length, 1);
+      assert.deepEqual(await readdir(dir), []);
+    } finally {
+      clearTimeout(timer);
+    }
+  }));
+test("permanent status errors report polling diagnostics without retrying or resubmitting", async () =>
+  temporary(async (dir) => {
+    const t = transport();
+    let requests = 0;
+    const c = client(dir, t, {
+      fetcher: (request) => {
+        if (request.url.endsWith("/videos/fixture-1")) {
+          requests++;
+          return Promise.resolve(new Response(JSON.stringify({
+            error: { code: 401, message: "Invalid key TEST_KEY" },
+          }), { status: 401, headers: { "Content-Type": "application/json" } }));
+        }
+        return t.fetcher(request);
+      },
+    });
+    const plan = await c.plan(input());
+    await assert.rejects(c.render(plan, { assets: store(dir), prompt: "Scene" }), (error) => {
+      assert.equal(error.code, "POLL_REQUEST");
+      assert.equal(error.context.stage, "polling");
+      assert.equal(error.context.jobId, "fixture-1");
+      assert.equal(error.context.providerError.status, 401);
+      assert.equal(error.context.providerError.message, "Invalid key [REDACTED]");
+      assert.ok(!JSON.stringify(error).includes("TEST_KEY"));
+      return true;
+    });
+    assert.equal(requests, 1);
+    assert.equal(t.submissions.length, 1);
+  }));
+test("third-segment rejection preserves provider diagnostics and completed assets without retrying POST", async () =>
+  temporary(async (dir) => {
+    const provider = {
+      code: "InputImageSensitiveContentDetected.PrivacyInformation",
+      message: "The input image may contain a real person. TEST_KEY",
+      param: "",
+      type: "BadRequest",
+    };
+    const wrappedMessage = `HTTP 400: ${JSON.stringify({ error: provider })}`;
+    const t = transport({
+      video,
+      onSubmit: (_body, n) => {
+        if (n !== 3) {return;}
+        return new Response(JSON.stringify({
+          error: {
+            code: 400,
+            message: wrappedMessage,
+          },
+        }), { status: 400, headers: { "Content-Type": "application/json" } });
+      },
+    });
+    const c = client(dir, t);
+    const plan = await c.plan({ ...input(), audio: { path: await source(dir, 4.4) } });
+    assert.equal(plan.segments.length, 3);
+    await assert.rejects(
+      c.render(plan, { assets: store(dir), prompt: "Scene" }),
+      (error) => {
+        assert.equal(error.code, "SUBMISSION");
+        assert.equal(error.message,
+          "OpenRouter rejected the submission (HTTP 400): The input image may contain a real person. [REDACTED]");
+        assert.equal(error.context.stage, "submission");
+        assert.equal(error.context.segmentIndex, 2);
+        assert.equal(error.context.completedSegments.length, 2);
+        assert.equal(error.context.publishedAssets.length, 4);
+        assert.deepEqual(error.context.providerError, {
+          status: 400,
+          code: 400,
+          message: wrappedMessage.replaceAll("TEST_KEY", "[REDACTED]"),
+          providerName: undefined,
+          providerCode: "InputImageSensitiveContentDetected.PrivacyInformation",
+          providerMessage: "The input image may contain a real person. [REDACTED]",
+        });
+        assert.equal(error.context.submission.model, "fixture/video");
+        assert.equal(error.context.submission.duration, 1);
+        assert.equal(error.context.submission.size, output.size);
+        assert.equal(error.context.submission.frameImageUrl,
+          error.context.completedSegments[1].endingImage.url);
+        assert.ok(!JSON.stringify(error).includes("TEST_KEY"));
+        return true;
+      },
+    );
+    assert.equal(t.submissions.length, 3);
   }));
 test("failed frame publication stops the dependent request and retains published video context", async () =>
   temporary(async (dir) => {

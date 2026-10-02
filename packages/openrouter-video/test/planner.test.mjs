@@ -125,6 +125,36 @@ test("empty source and unusable speech timings are rejected; confirmed silence i
       code: "TRANSCRIPTION_TIMING",
     });}
 });
+test("zero-length word intervals are accepted without moving cuts", () => {
+  const words = [
+    { word: "hello", start: 0.5, end: 1 },
+    { word: "world", start: 1.7400000095367432, end: 1.7400000095367432 },
+    { word: "again", start: 2, end: 3 },
+  ];
+  assert.deepEqual(validateWords("hello world again", words, 4), words);
+  const segments = planSegments(info(4), words, model, output);
+  assert.equal(segments.flatMap((s) => s.words).length, words.length);
+});
+test("sub-sample contiguous word boundaries do not chain into an oversized interval", () => {
+  // 1.7400000095367432 * 48000 = 83520.0004..., and 3.4800000190734863 *
+  // 48000 = 167040.0009...; rounding outwards used to fake a 1-sample overlap
+  // at each boundary, merging back-to-back words into one interval that
+  // exceeds the model cap instead of cutting between them.
+  const words = [
+    { word: "a", start: 0, end: 1.7400000095367432 },
+    { word: "b", start: 1.7400000095367432, end: 3.4800000190734863 },
+    { word: "c", start: 3.4800000190734863, end: 4.5 },
+  ];
+  const segments = planSegments(
+    info(6),
+    words,
+    { ...model, durations: [4] },
+    output,
+  );
+  assert.equal(segments.length, 2);
+  assert.equal(segments[1].end, 6);
+  assert.ok(Math.abs(segments[0].end - 3.4800000190734863) < 1e-6);
+});
 test("cumulative frame counts avoid independent rounding drift", () => {
   const segments = planSegments(
     info(24.031),

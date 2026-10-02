@@ -43,8 +43,11 @@ export interface ClientOptions {
   /** Fetch boundary for deterministic tests; requests still use the official SDK. */
   fetcher?: Fetcher;
   compatibilityProfiles?: readonly CompatibilityProfile[];
+  /** Delay between successful status requests; defaults to 2 seconds. */
   pollIntervalMs?: number;
+  /** Per-job polling budget, including status retries; defaults to 20 minutes. */
   pollTimeoutMs?: number;
+  /** Retries per status/download burst. Status bursts continue within the polling budget. */
   retries?: number;
   retryDelayMs?: number;
 }
@@ -357,17 +360,133 @@ export class OpenRouterVideo {
   private async retry<T>(
     work: () => Promise<T>,
     signal?: AbortSignal,
+    shouldRetry: (error: unknown) => boolean = retryable,
   ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       signal?.throwIfAborted();
       try {
         return await work();
       } catch (error) {
-        if (signal?.aborted || attempt >= this.retries || !retryable(error)) {
+        if (signal?.aborted || attempt >= this.retries || !shouldRetry(error)) {
           throw error;
         }
         await delay(this.retryDelay * 2 ** attempt, undefined, { signal });
       }
+    }
+  }
+  private async poll(
+    job: VideoGenerationResponse,
+    run: Run,
+    signal?: AbortSignal,
+  ): Promise<VideoGenerationResponse> {
+    const deadline = Date.now() + this.pollTimeout;
+    const timeout = new AbortController();
+    const interrupt = () => timeout.abort(signal?.reason);
+    signal?.addEventListener("abort", interrupt, { once: true });
+    if (signal?.aborted) {
+      interrupt();
+    }
+    const pollingSignal = timeout.signal;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Keep long configured budgets within Node's timer range.
+    const expire = () => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        timeout.abort();
+      } else {
+        timer = setTimeout(expire, Math.min(remaining, 2_147_483_647));
+      }
+    };
+    expire();
+    let failures = 0;
+    let lastError: unknown;
+    // An accepted job may not yet be visible to the status endpoint. Bound 404
+    // retries by this job's deadline, without retrying unrelated GETs or POSTs.
+    const retryStatus = (error: unknown) =>
+      httpStatus(error) === 404 || retryable(error);
+    try {
+      while (true) {
+        run.emit("polling");
+        pollingSignal.throwIfAborted();
+        if (job.status === "completed") {
+          return job;
+        }
+        if (["failed", "cancelled", "expired"].includes(job.status)) {
+          const jobError = this.router.errorMessage(job.error);
+          throw new VideoError(
+            "JOB_TERMINAL",
+            `OpenRouter job ended as ${job.status}${jobError ? `: ${jobError}` : ""}`,
+            { jobError },
+          );
+        }
+        if (!["pending", "in_progress"].includes(job.status)) {
+          throw new VideoError("JOB_TERMINAL", "Unknown OpenRouter job state");
+        }
+        if (Date.now() >= deadline) {
+          timeout.abort();
+          pollingSignal.throwIfAborted();
+        }
+        const interval = failures
+          ? Math.min(
+              30_000,
+              Math.max(this.pollInterval, this.retryDelay) *
+                2 ** Math.min(failures - 1, 10),
+            )
+          : this.pollInterval;
+        await delay(Math.min(interval, deadline - Date.now()), undefined, {
+          signal: pollingSignal,
+        });
+        if (Date.now() >= deadline) {
+          timeout.abort();
+        }
+        pollingSignal.throwIfAborted();
+        try {
+          job = await abortable(
+            this.retry(async () => {
+              try {
+                return await this.router.status(run.jobId!, pollingSignal);
+              } catch (error) {
+                lastError = error;
+                throw error;
+              }
+            }, pollingSignal, retryStatus),
+            pollingSignal,
+          );
+        } catch (error) {
+          pollingSignal.throwIfAborted();
+          if (!retryStatus(error)) {
+            throw new VideoError(
+              "POLL_REQUEST",
+              "Status request failed with a non-retryable error; remote job may still run",
+              { providerError: this.router.errorDetails(error) },
+            );
+          }
+          failures++;
+          continue;
+        }
+        if (job.id !== run.jobId) {
+          throw new VideoError(
+            "JOB_TERMINAL",
+            "Status response changed the job identity",
+          );
+        }
+        run.jobStatus = job.status;
+        failures = 0;
+        lastError = undefined;
+      }
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (timeout.signal.aborted || Date.now() >= deadline) {
+        throw new VideoError(
+          "POLL_TIMEOUT",
+          "Polling deadline exceeded; remote job may still run",
+          { providerError: this.router.errorDetails(lastError) },
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", interrupt);
     }
   }
   async render(
@@ -569,15 +688,31 @@ export class OpenRouterVideo {
             job = await this.router.submit(request, signal);
           } catch (error) {
             const status = httpStatus(error);
+            const providerError = this.router.errorDetails(error);
+            const context: FailureContext = {
+              providerError,
+              submission: {
+                model: current.id,
+                duration: segment.requestedDuration,
+                size: plan.output.size,
+                resolution: plan.output.resolution,
+                aspectRatio: plan.output.aspectRatio,
+                frameImageUrl: image,
+              },
+            };
             if (status && status < 500 && status !== 408) {
+              const detail =
+                providerError?.providerMessage ?? providerError?.message;
               throw new VideoError(
                 "SUBMISSION",
-                `OpenRouter rejected the submission (HTTP ${status})`,
+                `OpenRouter rejected the submission (HTTP ${status})${detail ? `: ${detail}` : ""}`,
+                context,
               );
             }
             throw new VideoError(
               "AMBIGUOUS_SUBMISSION",
               "Submission outcome is unknown; no replacement job was submitted",
+              context,
             );
           }
           run.jobId = job.id;
@@ -588,51 +723,7 @@ export class OpenRouterVideo {
               "Submission did not return a usable job ID",
             );
           }
-          const deadline = Date.now() + this.pollTimeout;
-          while (true) {
-            run.emit("polling");
-            if (job.status === "completed") {
-              break;
-            }
-            if (["failed", "cancelled", "expired"].includes(job.status)) {
-              throw new VideoError(
-                "JOB_TERMINAL",
-                `OpenRouter job ended as ${job.status}`,
-              );
-            }
-            if (!["pending", "in_progress"].includes(job.status)) {
-              throw new VideoError(
-                "JOB_TERMINAL",
-                "Unknown OpenRouter job state",
-              );
-            }
-            if (Date.now() >= deadline) {
-              throw new VideoError(
-                "POLL_TIMEOUT",
-                "Polling deadline exceeded; remote job may still run",
-              );
-            }
-            await delay(this.pollInterval, undefined, { signal });
-            try {
-              job = await this.retry(
-                () => this.router.status(run.jobId!, signal),
-                signal,
-              );
-            } catch {
-              signal?.throwIfAborted();
-              throw new VideoError(
-                "POLL_TIMEOUT",
-                "Status requests failed after bounded retries",
-              );
-            }
-            if (job.id !== run.jobId) {
-              throw new VideoError(
-                "JOB_TERMINAL",
-                "Status response changed the job identity",
-              );
-            }
-            run.jobStatus = job.status;
-          }
+          job = await this.poll(job, run, signal);
           run.emit("download");
           const downloaded = join(directory, `download-${segment.index}.mp4`);
           try {
