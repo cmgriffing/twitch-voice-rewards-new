@@ -1,0 +1,62 @@
+{
+  "catalog": {
+    "data": [
+      {
+        "id": "fixture/video",
+        "name": "Controlled fixture model",
+        "canonical_slug": "fixture/video",
+        "created": 1700000000,
+        "allowed_passthrough_parameters": ["quality"],
+        "creativity": null,
+        "generate_audio": true,
+        "seed": true,
+        "supported_aspect_ratios": ["16:9"],
+        "supported_durations": [1, 2],
+        "supported_frame_images": ["first_frame", "last_frame"],
+        "supported_resolutions": ["720p"],
+        "supported_sizes": ["160x90"],
+        "upscale_factor": null
+      }
+    ]
+  },
+  "transcription": {
+    "text": "hello world",
+    "duration": 2.4,
+    "words": [
+      { "word": "hello", "start": 0.1, "end": 0.5 },
+      { "word": "world", "start": 2.1, "end": 2.3 }
+    ]
+  },
+  "submission": {
+    "id": "fixture-job",
+    "generation_id": "fixture-generation",
+    "polling_url": "/api/v1/videos/fixture-job",
+    "status": "pending"
+  },
+  "pending": {
+    "id": "fixture-job",
+    "polling_url": "/api/v1/videos/fixture-job",
+    "status": "in_progress"
+  },
+  "completed": {
+    "id": "fixture-job",
+    "polling_url": "/api/v1/videos/fixture-job",
+    "status": "completed"
+  },
+  "request": {
+    "model": "fixture/video",
+    "duration": 2,
+    "size": "160x90",
+    "generate_audio": false,
+    "prompt": "A landscape",
+    "frame_images": [
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://assets.example/runs/fixture/frame-0.png"
+        },
+        "frame_type": "first_frame"
+      }
+    ]
+  }
+}
