@@ -1,6 +1,12 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "OPENROUTER_VIDEO_SMOKE",
+    "FFMPEG_PATH",
+    "FFPROBE_PATH",
+    "OPENROUTER_API_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

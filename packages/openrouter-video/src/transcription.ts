@@ -39,12 +39,14 @@ export function reconcile(
     );
   }
   const merged = [...previous, ...next.slice(right.length)];
-  for (let i = 1; i < merged.length; i++)
-    if (merged[i]!.start < merged[i - 1]!.start)
+  for (let i = 1; i < merged.length; i++) {
+    if (merged[i]!.start < merged[i - 1]!.start) {
       throw new VideoError(
         "RECONCILIATION",
         "Reconciled timings are unordered",
       );
+    }
+  }
   return merged;
 }
 export async function transcribe(
@@ -69,20 +71,22 @@ export async function transcribe(
     !Number.isSafeInteger(maxBytes) ||
     maxBytes < 4096 ||
     maxBytes > 24_000_000
-  )
+  ) {
     throw new VideoError(
       "CONFIGURATION",
       "Invalid transcription window or multipart byte budget",
     );
+  }
   // Mono 16kHz PCM WAV: reserve space for WAV and multipart headers.
   const seconds = Math.min(windowSeconds, (maxBytes - 2048) / 32000);
   const windowSamples = Math.floor(seconds * info.sampleRate),
     overlapSamples = Math.floor(overlapSeconds * info.sampleRate);
-  if (windowSamples <= overlapSamples || windowSamples < 1)
+  if (windowSamples <= overlapSamples || windowSamples < 1) {
     throw new VideoError(
       "CONFIGURATION",
       "Transcription budget must exceed its overlap",
     );
+  }
   let start = 0,
     previousEnd = 0,
     words: Word[] = [],
@@ -92,11 +96,12 @@ export async function transcribe(
     const end = Math.min(start + windowSamples, info.sampleCount);
     const path = join(directory, `stt-${batch}.wav`);
     await media.cutAudio(pcm, info, start, end, path, signal, undefined, true);
-    if ((await stat(path)).size + 1024 > maxBytes)
+    if ((await stat(path)).size + 1024 > maxBytes) {
       throw new VideoError(
         "CONFIGURATION",
         "Transcription payload exceeds its configured budget",
       );
+    }
     onWindow?.();
     let response;
     try {
@@ -124,7 +129,9 @@ export async function transcribe(
     words = batch
       ? reconcile(words, shifted, offset, previousEnd / info.sampleRate)
       : shifted;
-    if (end === info.sampleCount) break;
+    if (end === info.sampleCount) {
+      break;
+    }
     previousEnd = end;
     start = end - overlapSamples;
     batch++;

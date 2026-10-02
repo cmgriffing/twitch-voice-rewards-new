@@ -87,19 +87,23 @@ export async function runCli(
     if (
       parsed.positionals.length !== 1 ||
       !["models", "plan", "generate", "serve"].includes(command)
-    )
+    ) {
       throw new Error(
         "Choose models, plan, generate, or serve; use --help for options",
       );
+    }
     const required = (key: keyof typeof v): string => {
       const value = v[key];
-      if (typeof value !== "string" || !value.trim())
+      if (typeof value !== "string" || !value.trim()) {
         throw new Error(`--${key} is required`);
+      }
       return value;
     };
     const number = (key: keyof typeof v, fallback: number) => {
       const value = v[key] === undefined ? fallback : Number(v[key]);
-      if (!Number.isFinite(value)) throw new Error(`--${key} must be numeric`);
+      if (!Number.isFinite(value)) {
+        throw new Error(`--${key} must be numeric`);
+      }
       return value;
     };
     const print = (value: unknown) =>
@@ -115,13 +119,18 @@ export async function runCli(
       const address = server.address();
       print({ directory: v["asset-dir"], address, prefix: v.prefix ?? "/" });
       await new Promise<void>((done) => {
-        if (!server.listening) done();
-        else server.once("close", done);
+        if (!server.listening) {
+          done();
+        } else {
+          server.once("close", done);
+        }
       });
       return signal?.aborted ? 130 : 0;
     }
     const apiKey = environment.OPENROUTER_API_KEY;
-    if (!apiKey) throw new Error("Set OPENROUTER_API_KEY");
+    if (!apiKey) {
+      throw new Error("Set OPENROUTER_API_KEY");
+    }
     const client = (
       dependencies.createClient ?? ((options) => new OpenRouterVideo(options))
     )({
@@ -137,12 +146,15 @@ export async function runCli(
       );
     if (command === "models") {
       const models = await client.discover({ signal, onProgress });
-      if (v.json) print(models);
-      else
-        for (const model of models)
+      if (v.json) {
+        print(models);
+      } else {
+        for (const model of models) {
           io.stdout(
             `${model.id}: durations=${model.durations.join(",")} frames=${model.frameRoles.join(",")} sizes=${model.sizes.join(",")} resolutions=${model.resolutions.join(",")} aspectRatios=${model.aspectRatios.join(",")} nativeAudio=${model.nativeAudio}\n`,
           );
+        }
+      }
       return 0;
     }
     const input = {
@@ -170,24 +182,29 @@ export async function runCli(
         "Planning calls OpenRouter STT and can incur transcription charges; no video jobs are submitted.\n",
       );
       const plan = await client.plan(input);
-      if (v.json) print(plan);
-      else {
+      if (v.json) {
+        print(plan);
+      } else {
         io.stdout(
           `${plan.model.id}: ${plan.sourceInfo.duration}s; frames=${plan.model.frameRoles.join(",")}\n`,
         );
-        for (const segment of plan.segments)
+        for (const segment of plan.segments) {
           io.stdout(
             `${segment.index + 1}: samples ${segment.startSample}..${segment.endSample}; ${segment.start}..${segment.end}s; request=${segment.requestedDuration}s retained=${segment.retainedDuration}s mode=${segment.mode}\n${segment.transcript}\n${segment.fallbackReason ?? ""}\n`,
           );
+        }
       }
       return 0;
     }
-    if (!!v.prompt === !!v["prompt-file"])
+    if (!!v.prompt === !!v["prompt-file"]) {
       throw new Error("Supply exactly one of --prompt or --prompt-file");
+    }
     const prompt = v["prompt-file"]
       ? await readFile(v["prompt-file"], "utf8")
       : v.prompt!;
-    if (!prompt.trim()) throw new Error("Prompt cannot be empty");
+    if (!prompt.trim()) {
+      throw new Error("Prompt cannot be empty");
+    }
     const directory = required("asset-dir");
     const assets = createLocalFilesystemAdapter({
       directory,
@@ -201,14 +218,18 @@ export async function runCli(
       onProgress,
     });
     const path = join(directory, ...result.finalVideo.key.split("/"));
-    if (v.output) await copyFile(path, v.output, constants.COPYFILE_EXCL);
-    if (v.json) print({ ...result, localPath: v.output ?? path });
-    else
+    if (v.output) {
+      await copyFile(path, v.output, constants.COPYFILE_EXCL);
+    }
+    if (v.json) {
+      print({ ...result, localPath: v.output ?? path });
+    } else {
       io.stdout(`Final video: ${v.output ?? path}\n${result.finalVideo.url}\n`);
+    }
     return 0;
   } catch (error) {
     const interrupted = signal?.aborted;
-    if (error instanceof VideoError)
+    if (error instanceof VideoError) {
       io.stderr(
         JSON.stringify({
           code: error.code,
@@ -216,10 +237,11 @@ export async function runCli(
           context: error.context,
         }) + "\n",
       );
-    else
+    } else {
       io.stderr(
         (error instanceof Error ? error.message : "Command failed") + "\n",
       );
+    }
     return interrupted ? 130 : 1;
   }
 }

@@ -63,14 +63,16 @@ export function httpStatus(error: unknown): number | undefined {
     typeof error === "object" &&
     "statusCode" in error &&
     typeof error.statusCode === "number"
-  )
+  ) {
     return error.statusCode;
+  }
   return undefined;
 }
 export function retryable(error: unknown) {
   const status = httpStatus(error);
-  if (status !== undefined)
+  if (status !== undefined) {
     return status === 408 || status === 429 || status >= 500;
+  }
   return (
     error instanceof TypeError ||
     (error instanceof Error &&

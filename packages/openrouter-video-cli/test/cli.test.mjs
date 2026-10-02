@@ -259,7 +259,7 @@ test("static server serves complete media/ranges beneath route prefix and denies
       "/assets/.upload-pending",
       "/wrong/clip.mp4",
     ])
-      assert.ok([403, 404].includes((await get(port, path)).status), path);
+      {assert.ok([403, 404].includes((await get(port, path)).status), path);}
     controller.abort();
     await new Promise((done) => server.once("close", done));
   } finally {

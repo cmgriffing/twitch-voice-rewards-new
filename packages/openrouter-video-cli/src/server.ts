@@ -28,12 +28,15 @@ export async function serveAssets(options: {
     !Number.isInteger(options.port) ||
     options.port < 0 ||
     options.port > 65535
-  )
+  ) {
     throw new Error("Port must be an integer from 0 through 65535");
+  }
   const prefix =
     "/" + (options.prefix ?? "").split("/").filter(Boolean).join("/");
-  if (prefix.includes("..") || /[\\?#%\x00-\x1f]/.test(prefix))
+  // eslint-disable-next-line no-control-regex -- control characters are intentionally rejected in route prefixes
+  if (prefix.includes("..") || /[\\?#%\x00-\x1f]/.test(prefix)) {
     throw new Error("Invalid route prefix");
+  }
   const route = prefix === "/" ? "/" : prefix + "/";
   await mkdir(resolve(options.directory), { recursive: true });
   const root = await realpath(resolve(options.directory));
@@ -53,7 +56,8 @@ export async function serveAssets(options: {
       }
       const parts = path.slice(route.length).split("/").map(decodeURIComponent);
       if (
-        parts.some((p) => !p || p.startsWith(".") || /[\/\\\x00-\x1f]/.test(p))
+        // eslint-disable-next-line no-control-regex -- control characters are intentionally rejected in asset paths
+        parts.some((p) => !p || p.startsWith(".") || /[/\\\x00-\x1f]/.test(p))
       ) {
         response.writeHead(403).end();
         return;
@@ -88,10 +92,13 @@ export async function serveAssets(options: {
           response.writeHead(416).end();
           return;
         }
-        if (!range[1]) start = Math.max(0, info.size - Number(range[2]));
-        else {
+        if (!range[1]) {
+          start = Math.max(0, info.size - Number(range[2]));
+        } else {
           start = Number(range[1]);
-          if (range[2]) end = Math.min(Number(range[2]), end);
+          if (range[2]) {
+            end = Math.min(Number(range[2]), end);
+          }
         }
         if (
           start > end ||
@@ -122,8 +129,11 @@ export async function serveAssets(options: {
         response,
       );
     } catch {
-      if (!response.headersSent) response.writeHead(404).end();
-      else response.destroy();
+      if (!response.headersSent) {
+        response.writeHead(404).end();
+      } else {
+        response.destroy();
+      }
     } finally {
       await handle?.close();
     }
@@ -144,6 +154,8 @@ export async function serveAssets(options: {
   server.once("close", () =>
     options.signal?.removeEventListener("abort", close),
   );
-  if (options.signal?.aborted) close();
+  if (options.signal?.aborted) {
+    close();
+  }
   return server;
 }

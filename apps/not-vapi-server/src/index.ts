@@ -5,12 +5,6 @@ import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
 
-// nodeJS specific
-import { Readable } from "node:stream";
-import path from "path";
-import fs from "fs";
-import { glob } from "glob";
-
 import z from "zod";
 
 import {

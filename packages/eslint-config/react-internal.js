@@ -12,6 +12,9 @@ const project = resolve(process.cwd(), "tsconfig.json");
 module.exports = {
   extends: ["eslint:recommended", "prettier", "eslint-config-turbo"],
   plugins: ["only-warn"],
+  rules: {
+    curly: ["error", "all"],
+  },
   globals: {
     React: true,
     JSX: true,

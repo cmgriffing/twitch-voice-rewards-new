@@ -63,10 +63,10 @@ test("ceiling from integer samples handles fractional and exact boundaries", () 
     [1.2, 4],
     [6, 6],
   ])
-    assert.equal(
+    {assert.equal(
       planSegments(info(seconds), [], model, output)[0].requestedDuration,
       expected,
-    );
+    );}
   assert.deepEqual(
     planSegments(info(9.2), [], model, output).map((s) => s.requestedDuration),
     [8, 4],
@@ -121,9 +121,9 @@ test("empty source and unusable speech timings are rejected; confirmed silence i
       { word: "b", start: 0.1, end: 0.4 },
     ],
   ])
-    assert.throws(() => validateWords("speech", words, 1), {
+    {assert.throws(() => validateWords("speech", words, 1), {
       code: "TRANSCRIPTION_TIMING",
-    });
+    });}
 });
 test("cumulative frame counts avoid independent rounding drift", () => {
   const segments = planSegments(
@@ -244,7 +244,7 @@ test("revalidation reports changed durations/frame roles/modes as stale", () => 
     { ...model, durations: [4, 6] },
     { ...model, frameRoles: [] },
   ])
-    assert.throws(() => revalidate(plan, changed), { code: "STALE_PLAN" });
+    {assert.throws(() => revalidate(plan, changed), { code: "STALE_PLAN" });}
 });
 test("overlap reconciliation retains each word once and rejects ambiguous repetition", () => {
   const a = [

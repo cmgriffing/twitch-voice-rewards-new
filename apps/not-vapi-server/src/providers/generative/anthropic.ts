@@ -27,7 +27,7 @@ export class AnthropicProvider
   async getPromptResponse(
     prompt: string,
     model: string,
-    userName: string
+    userName: string,
   ): Promise<string> {
     const { ANTHROPIC_KEY: API_KEY } = this.env;
 
@@ -86,25 +86,4 @@ export class AnthropicProvider
       .map((content) => (content.type === "text" ? content.text : ""))
       .join(" ");
   }
-}
-
-interface AnthropicPromptResponse {
-  content: Content[];
-  id: string;
-  model: string;
-  role: string;
-  stop_reason: string;
-  stop_sequence: null;
-  type: string;
-  usage: Usage;
-}
-
-interface Content {
-  text: string;
-  type: string;
-}
-
-interface Usage {
-  input_tokens: number;
-  output_tokens: number;
 }

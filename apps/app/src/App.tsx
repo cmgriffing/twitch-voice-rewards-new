@@ -480,6 +480,9 @@ function App() {
     selectedVoiceProvider,
     selectedVoice,
     customInitialMessage,
+    availableVoices,
+    shouldRandomizePrompt,
+    shouldRandomizeVoice,
   ]);
 
   useEffect(() => {

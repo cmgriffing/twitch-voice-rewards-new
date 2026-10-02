@@ -24,7 +24,7 @@ export class OpenaiProvider
   async getPromptResponse(
     prompt: string,
     model: string,
-    userName: string
+    userName: string,
   ): Promise<string> {
     const { OPENAI_KEY: API_KEY } = this.env;
 
@@ -78,32 +78,4 @@ export class OpenaiProvider
 
     return chatCompletion.choices[0].message.content || "";
   }
-}
-
-interface OpenaiPromptResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  system_fingerprint: string;
-  choices: Choice[];
-  usage: Usage;
-}
-
-interface Choice {
-  index: number;
-  message: Message;
-  logprobs: null;
-  finish_reason: string;
-}
-
-interface Message {
-  role: string;
-  content: string;
-}
-
-interface Usage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
 }

@@ -1,11 +1,10 @@
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   OpenRouterVideo,
-  createCallbackAdapter,
   createLocalFilesystemAdapter,
 } from "../dist/index.js";
 import {
@@ -341,7 +340,7 @@ test("failed frame publication stops the dependent request and retains published
         assets: {
           write: (write) => {
             if (write.key.endsWith("frame-0.png"))
-              throw new Error("storage failed");
+              {throw new Error("storage failed");}
             return assets.write(write);
           },
         },
@@ -367,7 +366,7 @@ test("abort stops local work, cleans workspace, retains accepted job ID and publ
         prompt: "Scene",
         signal: controller.signal,
         onProgress: (e) => {
-          if (e.segmentIndex === 1 && e.jobId) controller.abort();
+          if (e.segmentIndex === 1 && e.jobId) {controller.abort();}
         },
       }),
       (error) =>
@@ -391,7 +390,7 @@ test("final write failure emits no completion and retains completed assets", asy
         onProgress: (e) => events.push(e),
         assets: {
           write: (write) => {
-            if (write.key.endsWith("/final.mp4")) throw new Error("disk full");
+            if (write.key.endsWith("/final.mp4")) {throw new Error("disk full");}
             return assets.write(write);
           },
         },

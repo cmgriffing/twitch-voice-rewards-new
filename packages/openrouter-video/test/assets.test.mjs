@@ -11,7 +11,7 @@ const bytes = new Uint8Array([1, 2, 3]);
 test("callback supports signed URLs and returned keys under a prefixed base", async () => {
   const writer = async (input) => {
     const received = [];
-    for await (const part of input.data) received.push(...part);
+    for await (const part of input.data) {received.push(...part);}
     assert.deepEqual(received, [1, 2, 3]);
     return { key: "remote", url: "https://cdn.test/remote?signature=test" };
   };
@@ -99,10 +99,10 @@ test("local confinement rejects traversal, absolute keys, symlinks, and overwrit
       "escape/file.mp4",
       "C:/outside",
     ])
-      await assert.rejects(
+      {await assert.rejects(
         store.write({ key, data: bytes, mimeType: "video/mp4" }),
         { code: "STORAGE" },
-      );
+      );}
     await symlink(join(outside, "file"), join(root, "link"));
     await assert.rejects(
       store.write({ key: "link", data: bytes, mimeType: "video/mp4" }),

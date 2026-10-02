@@ -38,34 +38,40 @@ export function keyParts(key: string) {
         !p ||
         p === "." ||
         p === ".." ||
+        // eslint-disable-next-line no-control-regex -- control characters are intentionally rejected in asset keys
         /[\\\x00-\x1f]/.test(p) ||
         p.startsWith("."),
     ) ||
     /^[A-Za-z]:/.test(key)
-  )
+  ) {
     throw new VideoError("STORAGE", "Invalid or escaping asset key", {
       assetKey: key,
     });
+  }
   return parts;
 }
 export function assetUrl(baseUrl: string, key: string) {
   const base = new URL(publicUrl(baseUrl));
-  if (base.search || base.hash)
+  if (base.search || base.hash) {
     throw new VideoError(
       "ASSET_URL",
       "A public base URL cannot contain a query or fragment",
     );
+  }
   base.pathname =
     base.pathname.replace(/\/?$/, "/") +
     keyParts(key).map(encodeURIComponent).join("/");
   return base.href;
 }
 export function dataStream(data: AssetData): Readable {
-  if (data instanceof Uint8Array) return Readable.from([data]);
-  if (data instanceof ReadableStream)
+  if (data instanceof Uint8Array) {
+    return Readable.from([data]);
+  }
+  if (data instanceof ReadableStream) {
     return Readable.fromWeb(
       data as import("node:stream/web").ReadableStream<Uint8Array>,
     );
+  }
   return Readable.from(data);
 }
 export function createCallbackAdapter(
@@ -116,7 +122,9 @@ export function createLocalFilesystemAdapter(options: {
       for (const part of parts.slice(0, -1)) {
         parent = join(parent, part);
         await mkdir(parent).catch((e: NodeJS.ErrnoException) => {
-          if (e.code !== "EEXIST") throw e;
+          if (e.code !== "EEXIST") {
+            throw e;
+          }
         });
         const stat = await lstat(parent);
         if (
@@ -132,10 +140,11 @@ export function createLocalFilesystemAdapter(options: {
         }
       }
       const target = join(parent, parts[parts.length - 1]!);
-      if (!beneath(root, target))
+      if (!beneath(root, target)) {
         throw new VideoError("STORAGE", "Asset escapes root", {
           assetKey: input.key,
         });
+      }
       const temporary = join(dirname(target), `.upload-${randomUUID()}`);
       try {
         const handle = await open(
@@ -153,8 +162,9 @@ export function createLocalFilesystemAdapter(options: {
         if (
           (realParent !== root && !beneath(root, realParent)) ||
           (await lstat(parent)).isSymbolicLink()
-        )
+        ) {
           throw new VideoError("STORAGE", "Asset parent changed while writing");
+        }
         // A hard link publishes the completed file atomically without replacing existing files or links.
         await link(temporary, target);
         return {
@@ -163,7 +173,9 @@ export function createLocalFilesystemAdapter(options: {
           url: assetUrl(options.baseUrl, input.key),
         };
       } catch (error) {
-        if (error instanceof VideoError) throw error;
+        if (error instanceof VideoError) {
+          throw error;
+        }
         throw new VideoError("STORAGE", "Asset write failed", {
           assetKey: input.key,
         });

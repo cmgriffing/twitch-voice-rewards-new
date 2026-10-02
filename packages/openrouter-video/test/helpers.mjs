@@ -81,14 +81,14 @@ export function transport(options = {}) {
       authorization: request.headers.get("Authorization"),
     });
     if (url.pathname.endsWith("/videos/models"))
-      return json(options.catalog ?? fixture.catalog);
+      {return json(options.catalog ?? fixture.catalog);}
     if (url.pathname.endsWith("/audio/transcriptions")) {
       const form = await request.formData();
       if (
         form.get("response_format") !== "verbose_json" ||
         form.get("timestamp_granularities[]") !== "word"
       )
-        throw new Error("Missing timing fields");
+        {throw new Error("Missing timing fields");}
       options.onStt?.(form);
       return json(
         options.transcriptions?.[sttIndex++] ?? fixture.transcription,
@@ -110,7 +110,7 @@ export function transport(options = {}) {
         downloadError = true;
         return json({ error: { code: 503, message: "temporary" } }, 503);
       }
-      if (!options.video) throw new Error("No fixture video");
+      if (!options.video) {throw new Error("No fixture video");}
       return new Response(options.video, {
         headers: { "Content-Type": "video/mp4" },
       });

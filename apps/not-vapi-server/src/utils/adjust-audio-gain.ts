@@ -15,7 +15,7 @@ export function adjustAudioGain(
     const ffmpegProcess = exec(
       `${ffmpegPath()} -i pipe:0 -filter:a volume=${multiplier} -f mp3 pipe:1`,
       { encoding: "buffer", maxBuffer: 100 * 1024 * 1024 }, // 100MB buffer limit
-      (error, stdout, stderr) => {
+      (error, stdout) => {
         if (error) {
           return reject(error);
         }

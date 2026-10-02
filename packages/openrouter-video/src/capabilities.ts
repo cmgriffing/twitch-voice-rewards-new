@@ -38,11 +38,12 @@ export function normalizeModel(
       ),
     ),
   ].sort((a, b) => a - b);
-  if (!durations.length && !allowMissingDurations)
+  if (!durations.length && !allowMissingDurations) {
     throw new VideoError(
       "UNSUPPORTED_MODEL",
       `No usable duration metadata for ${raw.id}`,
     );
+  }
   const profile = profileFor(raw.id, profiles);
   return {
     id: raw.id,
@@ -62,30 +63,33 @@ export function compatibleDurations(
   output: OutputConfig,
   profile?: CompatibilityProfile,
 ): number[] {
-  if (!Number.isInteger(output.fps) || output.fps < 1 || output.fps > 120)
+  if (!Number.isInteger(output.fps) || output.fps < 1 || output.fps > 120) {
     throw new VideoError(
       "CONFIGURATION",
       "Output fps must be an integer from 1 through 120",
     );
+  }
   if (output.size) {
     if (
       output.resolution ||
       output.aspectRatio ||
       !model.sizes.includes(output.size)
-    )
+    ) {
       throw new VideoError(
         "UNSUPPORTED_MODEL",
         "Unsupported or conflicting output size",
       );
+    }
     const dimensions = output.size
       .match(/^(\d+)x(\d+)$/)
       ?.slice(1)
       .map(Number);
-    if (!dimensions || dimensions.some((n) => !n || n % 2))
+    if (!dimensions || dimensions.some((n) => !n || n % 2)) {
       throw new VideoError(
         "CONFIGURATION",
         "Output size must use positive even dimensions",
       );
+    }
   } else if (
     !output.resolution ||
     !output.aspectRatio ||
@@ -103,14 +107,16 @@ export function compatibleDurations(
       (!rule.size || rule.size === output.size) &&
       (!rule.resolution || rule.resolution === output.resolution) &&
       (!rule.aspectRatio || rule.aspectRatio === output.aspectRatio)
-    )
+    ) {
       durations = durations.filter((d) => rule.durations.includes(d));
+    }
   }
-  if (!durations.length)
+  if (!durations.length) {
     throw new VideoError(
       "UNSUPPORTED_MODEL",
       "No durations compatible with output configuration",
     );
+  }
   return durations;
 }
 export function resolveMode(
@@ -120,11 +126,12 @@ export function resolveMode(
   hasImage: boolean,
   requested: number,
 ): Pick<SegmentPlan, "mode" | "fallbackReason"> {
-  if (requiresFrame && !model.frameRoles.includes("first_frame"))
+  if (requiresFrame && !model.frameRoles.includes("first_frame")) {
     throw new VideoError(
       "UNSUPPORTED_MODEL",
       "Model lacks enforced first-frame continuity",
     );
+  }
   const native = profile?.audio;
   if (
     native &&
@@ -132,13 +139,15 @@ export function resolveMode(
     (!native.durations || native.durations.includes(requested)) &&
     (!requiresFrame || native.firstFrame) &&
     (!native.requiresImage || hasImage)
-  )
+  ) {
     return { mode: "audio" };
-  if (profile?.transcriptRequiresImage && !hasImage)
+  }
+  if (profile?.transcriptRequiresImage && !hasImage) {
     throw new VideoError(
       "UNSUPPORTED_MODEL",
       "Selected route requires an initial image",
     );
+  }
   return {
     mode: "transcript",
     fallbackReason: native
@@ -152,11 +161,14 @@ export function revalidate(
   profile?: CompatibilityProfile,
 ) {
   try {
-    if (current.id !== plan.model.id) throw new Error("model");
+    if (current.id !== plan.model.id) {
+      throw new Error("model");
+    }
     const durations = compatibleDurations(current, plan.output, profile);
     for (const segment of plan.segments) {
-      if (!durations.includes(segment.requestedDuration))
+      if (!durations.includes(segment.requestedDuration)) {
         throw new Error("duration");
+      }
       const mode = resolveMode(
         current,
         profile,
@@ -164,7 +176,9 @@ export function revalidate(
         segment.index > 0 || !!plan.initialImage,
         segment.requestedDuration,
       );
-      if (mode.mode !== segment.mode) throw new Error("mode");
+      if (mode.mode !== segment.mode) {
+        throw new Error("mode");
+      }
     }
   } catch {
     throw new VideoError(

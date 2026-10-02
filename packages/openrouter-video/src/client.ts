@@ -71,34 +71,43 @@ const reserved = new Set([
 ]);
 function providerOptions(options: RenderOptions, model: ModelCapabilities) {
   for (const values of Object.values(options.providerOptions ?? {})) {
-    if (!values || typeof values !== "object" || Array.isArray(values))
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
       throw new VideoError(
         "CONFIGURATION",
         "Provider options must be keyed by provider SDK name",
       );
-    for (const key of Object.keys(values))
-      if (reserved.has(key) || !model.passthrough.includes(key))
+    }
+    for (const key of Object.keys(values)) {
+      if (reserved.has(key) || !model.passthrough.includes(key)) {
         throw new VideoError(
           "CONFIGURATION",
           `Unadvertised or reserved provider option: ${key}`,
         );
+      }
+    }
   }
 }
 async function abortable<T>(
   work: Promise<T>,
   signal?: AbortSignal,
 ): Promise<T> {
-  if (!signal) return work;
+  if (!signal) {
+    return work;
+  }
   let interrupt: (() => void) | undefined;
   const aborted = new Promise<never>((_, reject) => {
     interrupt = () => reject(signal.reason);
     signal.addEventListener("abort", interrupt, { once: true });
-    if (signal.aborted) interrupt();
+    if (signal.aborted) {
+      interrupt();
+    }
   });
   try {
     return await Promise.race([work, aborted]);
   } finally {
-    if (interrupt) signal.removeEventListener("abort", interrupt);
+    if (interrupt) {
+      signal.removeEventListener("abort", interrupt);
+    }
   }
 }
 class Run {
@@ -193,11 +202,12 @@ export class OpenRouterVideo {
   private readonly retries: number;
   private readonly retryDelay: number;
   constructor(options: ClientOptions) {
-    if (!options.apiKey?.trim())
+    if (!options.apiKey?.trim()) {
       throw new VideoError(
         "CONFIGURATION",
         "An OpenRouter API key is required",
       );
+    }
     this.router = new Router(options.apiKey, options.fetcher);
     this.media = new Media(options.tools);
     this.profiles = structuredClone(
@@ -216,11 +226,12 @@ export class OpenRouterVideo {
       !Number.isInteger(this.retries) ||
       this.retries < 0 ||
       this.retries > 10
-    )
+    ) {
       throw new VideoError(
         "CONFIGURATION",
         "Invalid polling/retry configuration",
       );
+    }
     for (const p of this.profiles) {
       profileFor(p.model, this.profiles);
       if (
@@ -228,11 +239,12 @@ export class OpenRouterVideo {
         (!(p.audio.maxSeconds > 0) ||
           !Number.isFinite(p.audio.maxSeconds) ||
           p.audio.format !== "wav")
-      )
+      ) {
         throw new VideoError(
           "CONFIGURATION",
           "Native profile requires a verified WAV input limit",
         );
+      }
     }
   }
   private async catalog(signal?: AbortSignal) {
@@ -259,8 +271,9 @@ export class OpenRouterVideo {
   }
   private async selected(id: string, signal?: AbortSignal) {
     const raw = (await this.catalog(signal)).find((m) => m.id === id);
-    if (!raw)
+    if (!raw) {
       throw new VideoError("UNSUPPORTED_MODEL", `Unknown video model: ${id}`);
+    }
     return normalizeModel(raw, this.profiles);
   }
   async plan(input: PlanInput): Promise<VideoPlan> {
@@ -273,9 +286,12 @@ export class OpenRouterVideo {
       const profile = profileFor(model.id, this.profiles);
       compatibleDurations(model, input.output, profile);
       this.media.dimensions(input.output);
-      if (!input.sttModel?.trim())
+      if (!input.sttModel?.trim()) {
         throw new VideoError("CONFIGURATION", "An STT model is required");
-      if (input.initialImage) publicUrl(input.initialImage);
+      }
+      if (input.initialImage) {
+        publicUrl(input.initialImage);
+      }
       return await this.media.workspace(async (directory) => {
         run.emit("probing");
         const { pcm, info } = await this.media.decode(
@@ -308,11 +324,12 @@ export class OpenRouterVideo {
           segments.some(
             (s) => retainedFrameCount(s, info.sampleRate, input.output.fps) < 1,
           )
-        )
+        ) {
           throw new VideoError(
             "SEGMENTATION",
             "A source segment is shorter than one output frame; choose a higher output fps",
           );
+        }
         const source =
           "path" in input.audio
             ? { path: resolve(input.audio.path) }
@@ -346,8 +363,9 @@ export class OpenRouterVideo {
       try {
         return await work();
       } catch (error) {
-        if (signal?.aborted || attempt >= this.retries || !retryable(error))
+        if (signal?.aborted || attempt >= this.retries || !retryable(error)) {
           throw error;
+        }
         await delay(this.retryDelay * 2 ** attempt, undefined, { signal });
       }
     }
@@ -368,26 +386,32 @@ export class OpenRouterVideo {
       try {
         current = await this.selected(plan.model.id, signal);
       } catch (error) {
-        if (error instanceof VideoError && error.code === "UNSUPPORTED_MODEL")
+        if (error instanceof VideoError && error.code === "UNSUPPORTED_MODEL") {
           throw new VideoError(
             "STALE_PLAN",
             "The planned model no longer has usable capabilities",
           );
+        }
         throw error;
       }
       const profile = profileFor(current.id, this.profiles);
       revalidate(plan, current, profile);
       providerOptions(options, current);
-      if (options.generateAudio && !current.generateAudio)
+      if (options.generateAudio && !current.generateAudio) {
         throw new VideoError(
           "UNSUPPORTED_MODEL",
           "Model does not advertise generated audio",
         );
-      if (options.seed !== undefined && !Number.isSafeInteger(options.seed))
+      }
+      if (options.seed !== undefined && !Number.isSafeInteger(options.seed)) {
         throw new VideoError("CONFIGURATION", "Seed must be an integer");
-      if (!options.assets || typeof options.assets.write !== "function")
+      }
+      if (!options.assets || typeof options.assets.write !== "function") {
         throw new VideoError("CONFIGURATION", "An asset store is required");
-      if (plan.initialImage) publicUrl(plan.initialImage);
+      }
+      if (plan.initialImage) {
+        publicUrl(plan.initialImage);
+      }
       const result = await this.media.workspace(async (directory) => {
         run.emit("probing");
         const { pcm, info } = await this.media.decode(
@@ -395,11 +419,12 @@ export class OpenRouterVideo {
           directory,
           signal,
         );
-        if (plan.version !== 1 || !isDeepStrictEqual(info, plan.sourceInfo))
+        if (plan.version !== 1 || !isDeepStrictEqual(info, plan.sourceInfo)) {
           throw new VideoError(
             "STALE_PLAN",
             "Source media changed since planning",
           );
+        }
         const expected = planSegments(
           info,
           plan.words,
@@ -408,11 +433,12 @@ export class OpenRouterVideo {
           plan.initialImage,
           profile,
         );
-        if (!isDeepStrictEqual(expected, plan.segments))
+        if (!isDeepStrictEqual(expected, plan.segments)) {
           throw new VideoError(
             "STALE_PLAN",
             "Plan boundaries or generation modes are inconsistent; replan",
           );
+        }
         const publish = async (
           path: string,
           filename: string,
@@ -431,7 +457,9 @@ export class OpenRouterVideo {
             signal?.throwIfAborted();
             return asset;
           } catch (error) {
-            if (error instanceof VideoError) throw error;
+            if (error instanceof VideoError) {
+              throw error;
+            }
             throw new VideoError("STORAGE", "Asset publication failed", {
               assetKey: key,
             });
@@ -468,7 +496,9 @@ export class OpenRouterVideo {
                     signal,
                   )
                 : options.prompt;
-            if (typeof prompt !== "string" || !prompt.trim()) throw new Error();
+            if (typeof prompt !== "string" || !prompt.trim()) {
+              throw new Error();
+            }
           } catch {
             throw new VideoError(
               "PROMPT",
@@ -539,11 +569,12 @@ export class OpenRouterVideo {
             job = await this.router.submit(request, signal);
           } catch (error) {
             const status = httpStatus(error);
-            if (status && status < 500 && status !== 408)
+            if (status && status < 500 && status !== 408) {
               throw new VideoError(
                 "SUBMISSION",
                 `OpenRouter rejected the submission (HTTP ${status})`,
               );
+            }
             throw new VideoError(
               "AMBIGUOUS_SUBMISSION",
               "Submission outcome is unknown; no replacement job was submitted",
@@ -551,30 +582,36 @@ export class OpenRouterVideo {
           }
           run.jobId = job.id;
           run.jobStatus = job.status;
-          if (!job.id)
+          if (!job.id) {
             throw new VideoError(
               "AMBIGUOUS_SUBMISSION",
               "Submission did not return a usable job ID",
             );
+          }
           const deadline = Date.now() + this.pollTimeout;
           while (true) {
             run.emit("polling");
-            if (job.status === "completed") break;
-            if (["failed", "cancelled", "expired"].includes(job.status))
+            if (job.status === "completed") {
+              break;
+            }
+            if (["failed", "cancelled", "expired"].includes(job.status)) {
               throw new VideoError(
                 "JOB_TERMINAL",
                 `OpenRouter job ended as ${job.status}`,
               );
-            if (!["pending", "in_progress"].includes(job.status))
+            }
+            if (!["pending", "in_progress"].includes(job.status)) {
               throw new VideoError(
                 "JOB_TERMINAL",
                 "Unknown OpenRouter job state",
               );
-            if (Date.now() >= deadline)
+            }
+            if (Date.now() >= deadline) {
               throw new VideoError(
                 "POLL_TIMEOUT",
                 "Polling deadline exceeded; remote job may still run",
               );
+            }
             await delay(this.pollInterval, undefined, { signal });
             try {
               job = await this.retry(
@@ -588,11 +625,12 @@ export class OpenRouterVideo {
                 "Status requests failed after bounded retries",
               );
             }
-            if (job.id !== run.jobId)
+            if (job.id !== run.jobId) {
               throw new VideoError(
                 "JOB_TERMINAL",
                 "Status response changed the job identity",
               );
+            }
             run.jobStatus = job.status;
           }
           run.emit("download");

@@ -1,6 +1,6 @@
 import type { ChatResult } from "@openrouter/sdk/models";
 import { GenerativeProvider } from "./_common";
-import type { OpenaiPromptResponse, GenerativeProviderMethods } from "./_types";
+import type { GenerativeProviderMethods } from "./_types";
 import { OpenRouter } from "@openrouter/sdk";
 
 export class OpenRouterProvider

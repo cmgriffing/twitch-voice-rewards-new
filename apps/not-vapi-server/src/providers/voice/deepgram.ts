@@ -1,6 +1,5 @@
 import type { Voice, VoiceProviderMethods } from "./_types";
 import { VoiceProvider } from "./_common";
-import { ReadableStream } from "stream/web";
 import fetch from "node-fetch";
 
 export class DeepgramProvider
@@ -33,7 +32,7 @@ export class DeepgramProvider
         body: JSON.stringify({
           text,
         }),
-      }
+      },
     );
     if (!response.ok) {
       throw new Error((await response.text()) || "error synthesizing voice");

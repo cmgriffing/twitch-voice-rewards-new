@@ -14,11 +14,12 @@ export function validateWords(
   words: Word[] | undefined,
   duration: number,
 ): Word[] {
-  if (text.trim() && !words?.length)
+  if (text.trim() && !words?.length) {
     throw new VideoError(
       "TRANSCRIPTION_TIMING",
       "Speech text has no usable word timings",
     );
+  }
   let previousStart = -1;
   for (const w of words ?? []) {
     if (
@@ -38,11 +39,12 @@ export function validateWords(
     }
     previousStart = w.start;
   }
-  if (!text.trim() && words?.length)
+  if (!text.trim() && words?.length) {
     throw new VideoError(
       "TRANSCRIPTION_TIMING",
       "Word timings contradict the empty transcript",
     );
+  }
   return words ?? [];
 }
 export function planSegments(
@@ -59,22 +61,24 @@ export function planSegments(
     sampleCount <= 0 ||
     !Number.isSafeInteger(sampleRate) ||
     sampleRate <= 0
-  )
+  ) {
     throw new VideoError(
       "SEGMENTATION",
       "Source audio must contain a positive sample timeline",
     );
+  }
   validateWords(
     words.map((w) => w.word).join(" "),
     words,
     sampleCount / sampleRate,
   );
   const durations = compatibleDurations(model, output, profile);
-  if (initialImage && !model.frameRoles.includes("first_frame"))
+  if (initialImage && !model.frameRoles.includes("first_frame")) {
     throw new VideoError(
       "UNSUPPORTED_MODEL",
       "Model cannot accept the supplied first-frame image",
     );
+  }
   const max = durations[durations.length - 1]! * sampleRate;
   // Union overlapping words, rounding outwards to avoid cutting through speech.
   const intervals: { start: number; end: number }[] = [];
@@ -84,8 +88,11 @@ export function planSegments(
       end: Math.ceil(w.end * sampleRate),
     };
     const last = intervals[intervals.length - 1];
-    if (last && span.start < last.end) last.end = Math.max(last.end, span.end);
-    else intervals.push(span);
+    if (last && span.start < last.end) {
+      last.end = Math.max(last.end, span.end);
+    } else {
+      intervals.push(span);
+    }
   }
   const result: SegmentPlan[] = [];
   let startSample = 0;
@@ -94,8 +101,10 @@ export function planSegments(
     const crossing = intervals.find(
       (w) => w.start < endSample && w.end > endSample,
     );
-    if (crossing) endSample = crossing.start;
-    if (endSample <= startSample)
+    if (crossing) {
+      endSample = crossing.start;
+    }
+    if (endSample <= startSample) {
       throw new VideoError(
         "SEGMENTATION",
         "No word-safe cut exists beneath the model cap",
@@ -106,6 +115,7 @@ export function planSegments(
           },
         },
       );
+    }
     const requestedDuration = durations.find(
       (d) => d >= Math.ceil((endSample - startSample) / sampleRate),
     )!;

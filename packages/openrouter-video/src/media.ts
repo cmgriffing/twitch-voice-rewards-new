@@ -43,7 +43,9 @@ export async function runTool(
       stderr = "";
     child.stdout.on("data", (chunk) => {
       out += chunk;
-      if (out.length > 8_000_000) child.kill();
+      if (out.length > 8_000_000) {
+        child.kill();
+      }
     });
     child.stderr.on("data", (chunk) => {
       stderr = (stderr + chunk).slice(-8000);
@@ -80,8 +82,9 @@ export class Media {
         !encoders.includes("libx264") ||
         !encoders.includes(" pcm_s16le ") ||
         !encoders.includes(" aac ")
-      )
+      ) {
         throw new Error();
+      }
       const filters = await runTool(
         this.ffmpeg,
         ["-hide_banner", "-filters"],
@@ -95,10 +98,15 @@ export class Media {
         "trim",
         "select",
         "concat",
-      ])
-        if (!filters.includes(` ${name} `)) throw new Error();
+      ]) {
+        if (!filters.includes(` ${name} `)) {
+          throw new Error();
+        }
+      }
     } catch {
-      if (signal?.aborted) signal.throwIfAborted();
+      if (signal?.aborted) {
+        signal.throwIfAborted();
+      }
       throw new VideoError(
         "TOOLCHAIN",
         "FFmpeg with libx264/AAC/PCM and required filters, plus FFprobe, must be executable before paid requests",
@@ -146,13 +154,15 @@ export class Media {
   }
   async decode(input: AudioInput, directory: string, signal?: AbortSignal) {
     let path: string;
-    if ("path" in input) path = resolve(input.path);
-    else {
-      if (!/^[a-zA-Z0-9]{1,10}$/.test(input.format) || !input.bytes.length)
+    if ("path" in input) {
+      path = resolve(input.path);
+    } else {
+      if (!/^[a-zA-Z0-9]{1,10}$/.test(input.format) || !input.bytes.length) {
         throw new VideoError(
           "CONFIGURATION",
           "Audio bytes need a nonempty payload and a format extension",
         );
+      }
       path = join(directory, `source.${input.format}`);
       await writeFile(path, input.bytes, { signal });
     }
@@ -165,8 +175,9 @@ export class Media {
       sampleRate < 1 ||
       !Number.isInteger(channels) ||
       channels < 1
-    )
+    ) {
       throw new VideoError("MEDIA", "Source has no usable audio stream");
+    }
     const pcm = join(directory, "source.pcm");
     await this.ff(
       [
@@ -184,8 +195,9 @@ export class Media {
       signal,
     );
     const sampleCount = (await stat(pcm)).size / (2 * channels);
-    if (!Number.isSafeInteger(sampleCount) || sampleCount < 1)
+    if (!Number.isSafeInteger(sampleCount) || sampleCount < 1) {
       throw new VideoError("SEGMENTATION", "Source audio is empty");
+    }
     const hash = createHash("sha256");
     for await (const bytes of createReadStream(pcm)) {
       signal?.throwIfAborted();
@@ -241,8 +253,9 @@ export class Media {
     );
   }
   dimensions(output: OutputConfig): [number, number] {
-    if (output.size)
+    if (output.size) {
       return output.size.split("x").map(Number) as [number, number];
+    }
     const heights: Record<string, number> = {
       "480p": 480,
       "720p": 720,
@@ -254,11 +267,12 @@ export class Media {
     };
     const shorter = heights[output.resolution!];
     const [a, b] = output.aspectRatio!.split(":").map(Number);
-    if (!shorter || !a || !b)
+    if (!shorter || !a || !b) {
       throw new VideoError(
         "CONFIGURATION",
         "Unknown output pixel configuration",
       );
+    }
     return a >= b
       ? [2 * Math.round((shorter * a) / b / 2), shorter]
       : [shorter, 2 * Math.round((shorter * b) / a / 2)];
@@ -274,11 +288,12 @@ export class Media {
     signal?: AbortSignal,
   ) {
     const frames = retainedFrameCount(segment, info.sampleRate, config.fps);
-    if (frames < 1)
+    if (frames < 1) {
       throw new VideoError(
         "MEDIA_DURATION",
         "Segment is shorter than one scheduled output frame",
       );
+    }
     const probe = await this.probe(input, signal);
     const video = probe.streams.find((s) => s.codec_type === "video");
     const duration = Number(video?.duration ?? probe.format.duration);
@@ -286,11 +301,12 @@ export class Media {
       !video ||
       !Number.isFinite(duration) ||
       duration + 1 / config.fps < frames / config.fps
-    )
+    ) {
       throw new VideoError(
         "MEDIA_DURATION",
         "Provider clip cannot cover its retained timeline",
       );
+    }
     const [width, height] = this.dimensions(config);
     const filter = `setpts=PTS-STARTPTS,fps=${config.fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,trim=end_frame=${frames},setpts=N/(${config.fps}*TB)`;
     await this.ff(
@@ -329,11 +345,12 @@ export class Media {
     const count = Number(
       normalized.streams.find((s) => s.codec_type === "video")?.nb_read_frames,
     );
-    if (count !== frames)
+    if (count !== frames) {
       throw new VideoError(
         "MEDIA_DURATION",
         "Decoded provider clip has too few retained frames",
       );
+    }
     await this.ff(
       [
         "-i",
@@ -366,11 +383,12 @@ export class Media {
       const frames = Number(
         probe.streams.find((s) => s.codec_type === "video")?.nb_read_frames,
       );
-      if (!Number.isSafeInteger(frames) || frames < 1)
+      if (!Number.isSafeInteger(frames) || frames < 1) {
         throw new VideoError(
           "MEDIA_DURATION",
           "Cannot schedule an empty retained clip",
         );
+      }
       entries.push(`file 'segment-${i}.mp4'\nduration ${frames / config.fps}`);
     }
     // Generated audio packet rounding must not shift the next clip's video timestamps.
@@ -419,11 +437,12 @@ export class Media {
       Number(video?.nb_read_frames) !==
         Math.round((info.sampleCount * config.fps) / info.sampleRate) ||
       Math.abs(Number(probe.format.duration) - info.duration) > 1 / config.fps
-    )
+    ) {
       throw new VideoError(
         "MEDIA_DURATION",
         "Assembled video differs from source by more than one output frame",
       );
+    }
     return final;
   }
 }

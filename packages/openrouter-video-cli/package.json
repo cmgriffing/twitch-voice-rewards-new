@@ -22,14 +22,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --ext .ts,.mjs --max-warnings 0",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@repo/openrouter-video": "workspace:*"
   },
   "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^20.11.24",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.3.3"
   }
 }

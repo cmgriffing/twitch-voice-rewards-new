@@ -19,6 +19,9 @@ module.exports = {
     browser: true,
   },
   plugins: ["only-warn"],
+  rules: {
+    curly: ["error", "all"],
+  },
   settings: {
     "import/resolver": {
       typescript: {

@@ -31,7 +31,7 @@ if (process.env.OPENROUTER_VIDEO_SMOKE !== "1") {
     },
   });
   for (const field of ["audio", "model", "stt-model", "asset-dir", "base-url"])
-    if (!values[field]) throw new Error(`--${field} is required`);
+    {if (!values[field]) {throw new Error(`--${field} is required`);}}
   const directory = resolve(values["asset-dir"]);
   const output = {
     size: values.size,
@@ -58,7 +58,7 @@ if (process.env.OPENROUTER_VIDEO_SMOKE !== "1") {
           request.method === "POST" &&
           new URL(request.url).pathname.endsWith("/videos")
         )
-          requests.push(await request.clone().json());
+          {requests.push(await request.clone().json());}
         return fetch(request);
       },
     });
@@ -112,10 +112,10 @@ if (process.env.OPENROUTER_VIDEO_SMOKE !== "1") {
           "Public MIME type must match",
         );
         const remoteHash = createHash("sha256");
-        for await (const chunk of response.body) remoteHash.update(chunk);
+        for await (const chunk of response.body) {remoteHash.update(chunk);}
         const localHash = createHash("sha256");
         for await (const chunk of createReadStream(join(directory, asset.key)))
-          localHash.update(chunk);
+          {localHash.update(chunk);}
         assert.equal(
           remoteHash.digest("hex"),
           localHash.digest("hex"),
