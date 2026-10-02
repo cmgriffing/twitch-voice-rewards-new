@@ -2,7 +2,7 @@ import { ffmpegPath, isFfmpegAvailable } from "node-av/ffmpeg";
 import { exec } from "node:child_process";
 
 export function adjustAudioGain(
-  inputArrayBuffer: Uint8Array<ArrayBufferLike>,
+  inputArrayBuffer: ArrayBufferLike,
   multiplier: number,
 ): Promise<ArrayBufferLike> {
   return new Promise((resolve, reject) => {

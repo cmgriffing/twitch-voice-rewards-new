@@ -4,6 +4,8 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
+import path from "path";
+import fs from "fs/promises";
 
 import z from "zod";
 
@@ -14,8 +16,8 @@ import {
 } from "./providers/index";
 import { env } from "hono/adapter";
 import { GenerativeModel } from "./providers/generative/_types";
-import { consumeCustomStream } from "./utils/readable-stream";
 import { adjustAudioGain } from "./utils/adjust-audio-gain";
+import { readableStreamToArrayBuffer } from "@openrouter/sdk/lib/files.js";
 
 const app = new Hono();
 
@@ -138,27 +140,27 @@ app.post("/prompt", async (c) => {
     );
 
     // TODO: Save to a file, but we probably want to do that after we add video to the results
-    // const today = new Date();
-    // const year = today.getFullYear() + "";
-    // const monthNumber = today.getMonth() + 1;
-    // const month = monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
+    const today = new Date();
+    const year = today.getFullYear() + "";
+    const monthNumber = today.getMonth() + 1;
+    const month = monthNumber < 10 ? `0${monthNumber}` : `${monthNumber}`;
 
-    // const fileDir = path.resolve(__dirname, "../archives/voice/", year, month);
-    // await fs.promises.mkdir(fileDir, { recursive: true });
+    const fileDir = path.resolve(__dirname, "../archives/voice/", year, month);
+    await fs.mkdir(fileDir, { recursive: true });
 
-    // const existingFiles = await glob(
-    //   path.resolve(fileDir, `${validatedRequest.username}-*`),
-    // );
-    // const increment = existingFiles.length;
-    // // const fileName = `${validatedRequest.username}-${increment}.mp3`;
-    // // const fileStream = fs.createWriteStream(path.resolve(fileDir, fileName));
-    // // console.log("voiceResponse", typeof voiceResponse);
-    // // Readable.fromWeb
-    // // (voiceResponse as any).pipe(fileStream);
+    const fileName = `${validatedRequest.username}-${Date.now()}.mp3`;
 
-    const responseBuffer = await consumeCustomStream(voiceResponse);
+    const responseBuffer = await readableStreamToArrayBuffer(voiceResponse);
     const normalizedBuffer = await adjustAudioGain(responseBuffer, voice.gain);
 
+    const fileResult = await fs.writeFile(
+      path.resolve(fileDir, fileName),
+      new Uint8Array(normalizedBuffer),
+    );
+
+    console.log({ fileResult });
+
+    // @ts-ignore
     const response = c.body(normalizedBuffer);
 
     return response;
